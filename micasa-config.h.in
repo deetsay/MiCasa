@@ -1,0 +1,2 @@
+#define micasa_VERSION_MAJOR @micasa_VERSION_MAJOR@
+#define micasa_VERSION_MINOR @micasa_VERSION_MINOR@

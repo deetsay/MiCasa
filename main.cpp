@@ -6,16 +6,18 @@
  * TODOs:
  * 
  * - optimize skipping folders (when not visible) even more
+ * - maybe far-away folders/pictures could be "squeezed"
+ *     so the scrollbar doesn't get completely ridiculous
  * - right-button menu
  * - sorting (files & folders)
  * - jumping to folder from the left "needs some fixin'"
- * - video player with ffmpeg(??)
+ * - video player needs polishing
  * - exif-data(?) / rotation(!)
+ * - build system with autoconf/automake or cmake (?) or something
+ *     or Ninja, if applicable, because it has the coolest name
  */
 
-// dear imgui: standalone example application for SDL2 + OpenGL
-// If you are new to dear imgui, see examples/README.txt and documentation at the top of imgui.cpp.
-// (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation, etc.)
+// Based on Dear imgui's standalone example application for SDL2 + OpenGL
 
 #include <stdio.h>
 #include <iostream>
@@ -30,6 +32,10 @@
 #include "folders.h"
 #include "vlc/vlc.h"
 
+#include "resources/roboto-medium.c"
+#include "resources/folder16x16.c"
+#include "resources/folder64x64.c"
+#include "resources/loading.c"
 
 int main(int argc, char *argv[]) {
 
@@ -90,15 +96,7 @@ int main(int argc, char *argv[]) {
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.IniFilename = NULL;
 
-    io.Fonts->AddFontFromFileTTF( "Roboto-Medium.ttf", 16.0f);
-    /*//io.Fonts->AddFontDefault();
-    // merge in icons from Font Awesome
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-    ImFontConfig icons_config;
-    icons_config.MergeMode = true;
-    icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF( FONT_ICON_FILE_NAME_FAR, 16.0f, &icons_config, icons_ranges );
-    */
+    io.Fonts->AddFontFromMemoryCompressedBase85TTF( roboto_medium_compressed_data_base85, 16.0f);
 
     // Setup Dear ImGui style
     ImGui::StyleColorsLight();
@@ -108,23 +106,12 @@ int main(int argc, char *argv[]) {
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL2_Init();
 
-    //bool show_another_window = false;
-    //ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    bool ret = false;
-    int my_image_width = 0;
-    int my_image_height = 0;
     GLuint Folder16Tex = 0;
-    ret = LoadTextureFromFile("resources/folder16x16.png", &Folder16Tex, &my_image_width, &my_image_height, 0, 0, false);
-    IM_ASSERT(ret);
-
+    LoadTextureFromMemory(folder16x16, sizeof(folder16x16), &Folder16Tex);
     GLuint Folder64Tex = 0;
-    ret = LoadTextureFromFile("resources/folder64x64.png", &Folder64Tex, &my_image_width, &my_image_height, 0, 0, false);
-    IM_ASSERT(ret);
-
+    LoadTextureFromMemory(folder64x64, sizeof(folder64x64), &Folder64Tex);
     GLuint LoadingTex = 0;
-    ret = LoadTextureFromFile("resources/loading.png", &LoadingTex, &my_image_width, &my_image_height, 0, 0, false);
-    IM_ASSERT(ret);
+    LoadTextureFromMemory(loading, sizeof(loading), &LoadingTex);
 
     Pic *loadAPic = NULL;
     Pic *currentPic = NULL;

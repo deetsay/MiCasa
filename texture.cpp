@@ -119,14 +119,7 @@ SDL_Surface *IMG_Load_To_Size(const char *filename, int *width, int *height, int
     return surface;
 }
 
-bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int *height, int limit_w, int limit_h, bool dropShadow) {
-
-    SDL_Surface *surface = IMG_Load_To_Size(filename, width, height, limit_w, limit_h, dropShadow);
-    if (surface == NULL) {
-	std::cout << "Unable to load image '" << filename << "' ! SDL_image Error: " << IMG_GetError() << std::endl;
-	return false;
-    }
-
+bool SurfaceToTexture(SDL_Surface *surface, GLuint *texture) {
     int Mode = GL_RGB;
     switch (surface->format->format) {
 	case SDL_PIXELFORMAT_ABGR8888:
@@ -147,7 +140,7 @@ bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int 
 	    break;
 
 	default:
-	    std::cout << "Error, image is not truecolor. '" << filename << "'" << std::endl;
+	    //std::cout << "Error, image is not truecolor." << std::endl;
 	    SDL_FreeSurface(surface);
 	    return false;
     }
@@ -157,14 +150,8 @@ bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int 
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     glTexImage2D(GL_TEXTURE_2D, 0, Mode, surface->w, surface->h, 0, Mode, GL_UNSIGNED_BYTE, surface->pixels);
 
-    if (*width < limit_w && *height < limit_h) {
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    } else {
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     //std::cout << "Image loaded: '" << filename << "' " << std::endl;
 
@@ -172,4 +159,35 @@ bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int 
     //*height = surface->h;
     SDL_FreeSurface(surface);
     return true;
+}
+
+bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int *height, int limit_w, int limit_h, bool dropShadow) {
+
+    SDL_Surface *surface = IMG_Load_To_Size(filename, width, height, limit_w, limit_h, dropShadow);
+    if (surface == NULL) {
+	std::cout << "Unable to load image '" << filename << "' ! SDL_image Error: " << IMG_GetError() << std::endl;
+	return false;
+    }
+    return SurfaceToTexture(surface, texture);
+
+    /*if (*width < limit_w && *height < limit_h) {
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    } else {
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }*/
+}
+
+void LoadTextureFromMemory(const void *data, int size, GLuint *texture) {
+    SDL_RWops *rw = SDL_RWFromConstMem(data, size);
+    if (rw != NULL) {
+	SDL_Surface *surface = IMG_LoadPNG_RW(rw);
+	if (surface != NULL) {
+	    SurfaceToTexture(surface, texture);
+	} else {
+	    std::cout << "Unable to load image! SDL_image Error: " << IMG_GetError() << std::endl;
+	}
+	SDL_RWclose(rw);
+    }
 }
