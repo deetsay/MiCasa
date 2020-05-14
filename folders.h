@@ -48,6 +48,7 @@ public:
 
     bool loaded;
     bool reallyLoaded;
+    bool isPreview;
     int limit_w;
     int limit_h;
     int width;

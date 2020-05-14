@@ -1,6 +1,5 @@
 #include "folders.h"
 #include <filesystem>
-//#include <cstddef>
 #include <iostream>
 #include <regex>
 #include <SDL.h>
@@ -45,7 +44,7 @@ Folder::Folder(Folders *folders, fs::path path) {
     this->firstPic = NULL;
     this->lastPic = NULL;
 
-    std::cout << "Folder created for " << path << std::endl;
+    //std::cout << "Folder created for " << path << std::endl;
     this->hasPictures = false;
     this->loaded = false;
 
@@ -101,11 +100,10 @@ void Folder::unload() {
 }
 
 Pic::Pic(Pic *pic) {
+    this->isPreview = false;
     this->next = pic->next;
     this->prev = pic->prev;
     this->path = pic->path;
-    this->limit_w = 0;
-    this->limit_h = 0;
     this->loaded = false;
     this->reallyLoaded = false;
     this->texture = pic->texture;
@@ -115,6 +113,7 @@ Pic::Pic(Pic *pic) {
 }
 
 Pic::Pic(Folder *folder, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
+    this->isPreview = true;
     this->next = NULL;
     this->prev = folder->lastPic;
     this->path = new fs::path(path);
@@ -148,7 +147,11 @@ Pic::~Pic() {
 void Pic::load() {
     if (this->isVideo == false) {
 	std::string s = this->path->string();
-	this->reallyLoaded = LoadTextureFromFile(s.c_str(), &(this->texture), &(this->width), &(this->height), this->limit_w, this->limit_h, true);
+	if (this->isPreview == true) {
+	    this->reallyLoaded = LoadPreviewTextureFromFile(s.c_str(), &(this->texture), &(this->width), &(this->height), this->limit_w, this->limit_h);
+	} else {
+	    this->reallyLoaded = LoadTextureFromFile(s.c_str(), &(this->texture), &(this->width), &(this->height));
+	}
     }
     this->loaded = true;
 }

@@ -1,57 +1,88 @@
-#include <stdlib.h>
-#include <assert.h>
-
 #include "vlclib-integration.h"
 
-// VLC prepares to render a video frame.
-void *lock(void *data, void **p_pixels) {
+#include <stdlib.h>
+#include <iostream>
+#include <assert.h>
 
-    struct context *c = (context *)data;
+#include "texture.h"
 
-    int pitch;
-    SDL_LockMutex(c->mutex);
-    SDL_LockTexture(c->texture, NULL, p_pixels, &pitch);
-
+void *vlc_lock(void *opaq, void **pixels) {
+    VLCLibIntegration *vlcinteg = (VLCLibIntegration *) opaq;
+    vlcinteg->mutex.lock();
+    *pixels = (void *) vlcinteg->pixels;
     return NULL; // Picture identifier, not needed here.
 }
 
-// VLC just rendered a video frame.
-void unlock(void *data, void *id, void *const *p_pixels) {
-
-    struct context *c = (context *)data;
-
-    //uint16_t *pixels = (uint16_t *)*p_pixels;
-
-    // We can also render stuff.
-    /*int x, y;
-    for(y = 10; y < 40; y++) {
-        for(x = 10; x < 40; x++) {
-            if(x < 13 || y < 13 || x > 36 || y > 36) {
-                pixels[y * VIDEOWIDTH + x] = 0xffff;
-            } else {
-                // RV16 = 5+6+5 pixels per color, BGR.
-                pixels[y * VIDEOWIDTH + x] = 0x02ff;
-            }
-        }
-    }*/
-
-    SDL_UnlockTexture(c->texture);
-    SDL_UnlockMutex(c->mutex);
+void vlc_unlock(void *opaq, void *id, void *const *pixels) {
+    VLCLibIntegration *vlcinteg = (VLCLibIntegration *) opaq;
+    vlcinteg->mutex.unlock();
 }
 
-// VLC wants to display a video frame.
-void display(void *data, void *id) {
+VLCLibIntegration::VLCLibIntegration() {
+    mp = NULL;
+    pixels = NULL;
 
-    struct context *c = (context *)data;
+    // If you don't have this variable set you must have plugins directory
+    // with the executable or libvlc_new() will not work!
+    //printf("VLC_PLUGIN_PATH=%s\n", getenv("VLC_PLUGIN_PATH"));
 
-    SDL_Rect rect;
-    rect.w = VIDEOWIDTH;
-    rect.h = VIDEOHEIGHT;
-    rect.x = 0;
-    rect.y = 0;
+    const char *vlc_argv[] = {
+	"--no-xlib"	// Don't use Xlib.
+    };
+    const int vlc_argc = 1;
 
-    SDL_SetRenderDrawColor(c->renderer, 0, 80, 0, 255);
-    SDL_RenderClear(c->renderer);
-    SDL_RenderCopy(c->renderer, c->texture, NULL, &rect);
-    SDL_RenderPresent(c->renderer);
+    // Initialise libVLC.
+    libvlc = libvlc_new(vlc_argc, vlc_argv);
+    if (libvlc == NULL) {
+	std::cout << "LibVLC initialization failure." << std::endl;
+    }
+}
+
+void VLCLibIntegration::integrate(Pic *pic) {
+    if (mp == NULL) {
+	libvlc_media_t *m = libvlc_media_new_path(libvlc, pic->path->c_str());
+	mp = libvlc_media_player_new_from_media(m);
+	libvlc_media_release(m);
+
+	if (!libvlc_media_is_parsed(m)) {
+	    libvlc_media_parse(m);
+	}
+	libvlc_video_get_size(mp, 0, (unsigned int *) (&(pic->width)), (unsigned int *) (&(pic->height)));
+
+	//std::cout << "w = " << currentPic->width << " h = " << currentPic->height << std::endl;
+
+	pixels = new (std::align_val_t(32)) char[pic->width * pic->height * 4]();
+	CreateNewTexture(&(pic->texture), GL_RGBA, pic->width, pic->height, (void *) pixels);
+	pic->reallyLoaded = true;
+
+	//std::cout << "texture = " << currentPic->texture << " pixels " << (void *) vlc_context.pixels << std::endl;
+
+	libvlc_video_set_callbacks(mp, vlc_lock, vlc_unlock, NULL, this);
+	libvlc_video_set_format(mp, "RGBA", pic->width, pic->height, pic->width*4);
+	libvlc_media_player_play(mp);
+    }
+
+    mutex.lock();
+    UpdateTexture(&(pic->texture), GL_RGBA, pic->width, pic->height, (void *) pixels);
+    mutex.unlock();
+    //if(!pause) { vlc_context.n++; }
+    //SDL_Delay(1000/10);
+}
+
+void VLCLibIntegration::bifurcate() {
+    if (mp != NULL) {
+	libvlc_media_player_stop(mp);
+	libvlc_media_player_release(mp);
+	mp = NULL;
+    }
+    if (pixels != NULL) {
+	delete [] pixels;
+	pixels = NULL;
+    }
+}
+
+VLCLibIntegration::~VLCLibIntegration() {
+    bifurcate();
+
+    libvlc_release(libvlc);
 }
