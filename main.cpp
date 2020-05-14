@@ -3,22 +3,23 @@
  *
  * es Free Casa
  * 
- * TODOs:
+ * TODOs por las tardes:
  * 
+ * - back-button (& folder navigation!) when viewing a pic/video
  * - optimize skipping folders (when not visible) even more
  * - maybe far-away folders/pictures could be "squeezed"
  *     so the scrollbar doesn't get completely ridiculous
  *   - maybe the scrollbar should be a custom widget
+ *   - "auto-closing" far-away folders?
  * - right-button menu
- * - sorting (files & folders)
+ * - sorting (files & folders)!!
  * - jumping to folder from the left "needs some fixin'"
- * - video player needs polishing
+ * - vlc integration uses deprecated methods, should probably look into that
+ *   - and those string warnings in main.cpp
  * - exif-data(?) / rotation(!)
- * - build system with autoconf/automake or cmake (?) or something
- *     or Ninja, if applicable, because it has the coolest name
  */
 
-// Based on Dear imgui's standalone example application for SDL2 + OpenGL
+// Based on Dear ImGui's standalone example application for SDL2 + OpenGL
 
 #include <stdio.h>
 #include <iostream>
@@ -190,8 +191,8 @@ void PhotoStreamOnTheRight() {
 
 void SingleChosenPic() {
     int pw, ph;
-    int dw = ImGui::GetWindowContentRegionMax().x * 9 / 10;
-    int dh = ImGui::GetWindowContentRegionMax().y * 9 / 10;
+    int dw = ImGui::GetWindowContentRegionMax().x; //* 96 / 100;
+    int dh = ImGui::GetWindowContentRegionMax().y; //* 96 / 100;
 
     if (currentPic->isVideo == true) {
 	vlcinteg.integrate(currentPic);
@@ -199,16 +200,41 @@ void SingleChosenPic() {
 
     Fit2U(&pw, &ph, currentPic->width, currentPic->height, dw, dh, true);
     ImVec2 cp = ImGui::GetCursorPos();
+
+
     ImGui::SetCursorPos(ImVec2(cp.x + (dw - pw) /2, cp.y + (dh - ph) / 2));
 
-    ImGui::ImageButton((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
-	ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 1, ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    //ImGui::ImageButton((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
+	//ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 1, ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    if (currentPic->reallyLoaded == false) {
+	ImGui::Image((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
+	    //ImVec2((float)4/currentPic->width,(float)4/currentPic->height),
+	    ImVec2(0.0f,0.0f),
+	    //ImVec2(0.7f,0.7f),
+	    ImVec2(
+		(float)(currentPic->width-4)/currentPic->width,
+		(float)(currentPic->height-4)/currentPic->height),
+	    ImVec4(1.0f, 1.8f, 1.0f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    } else {
+	ImGui::Image((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
+	    ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), ImVec4(1.0f, 1.8f, 1.0f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    }
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
 	vlcinteg.bifurcate();
 	delete currentPic;
 	currentPic = NULL;
     }
+
+    ImGui::SetCursorPos(cp);
+
+    ImGui::Button("Back to folder");
+    if (currentPic != NULL && ImGui::IsItemClicked()) {
+	vlcinteg.bifurcate();
+	delete currentPic;
+	currentPic = NULL;
+    }
+
 }
 
 int main(int argc, char *argv[]) {
@@ -217,8 +243,6 @@ int main(int argc, char *argv[]) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
-
-    int action = 0;
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -235,7 +259,7 @@ int main(int argc, char *argv[]) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); //(void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.IniFilename = NULL;
 
     io.Fonts->AddFontFromMemoryCompressedBase85TTF( roboto_medium_compressed_data_base85, 16.0f);
@@ -256,14 +280,15 @@ int main(int argc, char *argv[]) {
     currentPic = NULL;
     currentFolder = NULL;
     folderClicked = false;
-    folders = new Folders(argc >= 1 ? argv[1] : NULL);
     bool frist = true;
     bool done = false;
+
+    folders = new Folders(argc >= 1 ? argv[1] : NULL);
 
     // Main loop
     while (!done)
     {
-	action = 0;
+	int action = 0;
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
@@ -290,6 +315,29 @@ int main(int argc, char *argv[]) {
 		    currentPic = NULL;
 		}
                 break;
+	    case SDLK_f:
+		if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+		    SDL_SetWindowFullscreen(window, 0);
+		} else {
+		    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+		}
+		break;
+	    case SDLK_LEFT:
+		if (currentPic != NULL && currentPic->prev != NULL) {
+		    vlcinteg.bifurcate();
+		    Pic *pic = new Pic(currentPic->prev);
+		    delete currentPic;
+		    currentPic = pic;
+		}
+		break;
+	    case SDLK_RIGHT:
+		if (currentPic != NULL && currentPic->next != NULL) {
+		    vlcinteg.bifurcate();
+		    Pic *pic = new Pic(currentPic->next);
+		    delete currentPic;
+		    currentPic = pic;
+		}
+		break;
             //case ' ':
               //  printf("Pause toggle.\n");
               //  pause = !pause;
@@ -386,6 +434,8 @@ int main(int argc, char *argv[]) {
 	delete currentPic;
 	currentPic = NULL;
     }
+
+    delete folders;
 
     if (Folder16Tex != 0) {
 	glDeleteTextures(1, &Folder16Tex);
