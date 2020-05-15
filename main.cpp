@@ -44,16 +44,30 @@ GLuint Folder16Tex = 0;
 GLuint Folder64Tex = 0;
 GLuint LoadingTex = 0;
 
-VLCLibIntegration vlcinteg;
-
+VLCLibIntegration *vlc;
 Folders *folders;
 Folder *currentFolder;
 Pic *currentPic;
 Pic *loadAPic;
 bool folderClicked;
 
+void DropShadow(int x, int y, int w, int h) {
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddLine(ImVec2(x+w, y), ImVec2(x+w, y+h),  0xff666666, 1.0f);
+    draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xff666666, 1.0f);
+    x++; y++;
+    draw_list->AddLine(ImVec2(x+w, y), ImVec2(x+w, y+h),  0xff888888, 1.0f);
+    draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xff888888, 1.0f);
+    x++; y++;
+    draw_list->AddLine(ImVec2(x+w, y), ImVec2(x+w, y+h),  0xffaaaaaa, 1.0f);
+    draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xffaaaaaa, 1.0f);
+    x++; y++;
+    draw_list->AddLine(ImVec2(x+w, y), ImVec2(x+w, y+h),  0xffcccccc, 1.0f);
+    draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xffcccccc, 1.0f);
+}
+
 void FoldersOnTheLeft() {
-    ImGui::Text("Folders");
+    ImGui::TextUnformatted("Folders");
     Folder *folder = folders->first;
     while (folder != NULL) {
 	if (folder->hasPictures == true) {
@@ -81,13 +95,13 @@ void FoldersOnTheLeft() {
 	    //	FOLDER WITHOUT PICTURES -- non-clickable
 	    //
 	    std::string s = folder->path->filename().string();
-	    ImGui::Text(s.c_str());
+	    ImGui::TextUnformatted(s.c_str());
 	    ImGui::SameLine();
 	    ImDrawList *draw_list = ImGui::GetWindowDrawList();
 	    ImVec2 p = ImGui::GetCursorScreenPos();
 	    draw_list->AddLine(ImVec2(p.x, p.y+8), ImVec2(p.x + ImGui::GetColumnWidth(), p.y+8),  ImGui::GetColorU32(ImGuiCol_Border));
 	    ImGui::SameLine();
-	    ImGui::Text("");
+	    ImGui::TextUnformatted("");
 	}
 	folder = folder->next;
     }
@@ -111,7 +125,7 @@ void PhotoStreamOnTheRight() {
 	    ImGui::Image((void *)(intptr_t)Folder64Tex, ImVec2(64,64));
 	    ImGui::SameLine();
 	    std::string s = folder->path->string();
-	    ImGui::Text(s.c_str());
+	    ImGui::TextUnformatted(s.c_str());
 
 	    if (folder->loaded == false) {
 		folder->load(limit_w, limit_h, LoadingTex, limit_w, limit_h);
@@ -143,19 +157,27 @@ void PhotoStreamOnTheRight() {
 		    if (pic->loaded == false) {
 			loadAPic = pic;
 		    }
-		    ImVec2 cp = ImGui::GetCursorPos();
+		    ImVec2 cp = ImGui::GetCursorScreenPos();
 		    if (folderClicked == false && cp.y < ImGui::GetScrollY()+(ImGui::GetWindowSize().y/2)) {
 			currentFolder = folder;
 		    }
-		    ImGui::SetCursorPos(ImVec2(cp.x + (cw - pic->width) /2, cp.y + (cw - pic->height) / 2));
-		    ImGui::ImageButton((void*)(intptr_t)pic->texture, ImVec2(pic->width,pic->height), ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0, ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+		    int pw, ph;
+		    Fit2U(&pw, &ph, pic->width, pic->height, limit_w, limit_h, true);
+
+		    int x = cp.x + (cw - pw) / 2;
+		    int y = cp.y + (cw - ph) / 2;
+		    ImGui::SetCursorScreenPos(ImVec2(x, y));
+		    ImGui::ImageButton((void*)(intptr_t)pic->texture, ImVec2(pw,ph),
+			ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0,
+			ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 		    if (ImGui::IsItemClicked()) {
 			if (currentPic != NULL) {
 			    delete currentPic;
 			}
 			currentPic = new Pic(pic);
-
 		    }
+		    DropShadow(x, y, pw, ph);
 		    ImGui::NextColumn();
 		    pic = pic->next;
 		}
@@ -189,52 +211,62 @@ void PhotoStreamOnTheRight() {
     }
 }
 
+float zoom_value;
+float zoomoffset_x;
+float zoomoffset_y;
+
 void SingleChosenPic() {
+    ImGui::BeginChild("ScrollRegion3", ImVec2(0, 0), false);
+
+    ImGui::GetCurrentWindow()->ScrollMax.y = 1.0f;
+
+    zoom_value -= ImGui::GetIO().MouseWheel;
+    if (zoom_value < 1) {
+	zoom_value = 1;
+    }
+    if (zoom_value > 64) {
+	zoom_value = 64;
+    }
+
     int pw, ph;
-    int dw = ImGui::GetWindowContentRegionMax().x; //* 96 / 100;
-    int dh = ImGui::GetWindowContentRegionMax().y; //* 96 / 100;
+    int dw = ImGui::GetWindowContentRegionMax().x-4; //* 96 / 100;
+    int dh = ImGui::GetWindowContentRegionMax().y-4; //* 96 / 100;
 
     if (currentPic->isVideo == true) {
-	vlcinteg.integrate(currentPic);
+	vlc->integrate(currentPic);
     }
 
-    Fit2U(&pw, &ph, currentPic->width, currentPic->height, dw, dh, true);
-    ImVec2 cp = ImGui::GetCursorPos();
+    Fit2U(&pw, &ph, currentPic->width, currentPic->height, dw*64/zoom_value, dh*64/zoom_value, true);
+    ImVec2 cp = ImGui::GetCursorScreenPos();
 
+    int x = cp.x + (dw - pw) / 2;
+    int y = cp.y + (dh - ph) / 2;
 
-    ImGui::SetCursorPos(ImVec2(cp.x + (dw - pw) /2, cp.y + (dh - ph) / 2));
+    //ImGui::SetCursorScreenPos(ImVec2(x, y));
 
-    //ImGui::ImageButton((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
-	//ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 1, ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    if (currentPic->reallyLoaded == false) {
-	ImGui::Image((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
-	    //ImVec2((float)4/currentPic->width,(float)4/currentPic->height),
-	    ImVec2(0.0f,0.0f),
-	    //ImVec2(0.7f,0.7f),
-	    ImVec2(
-		(float)(currentPic->width-4)/currentPic->width,
-		(float)(currentPic->height-4)/currentPic->height),
-	    ImVec4(1.0f, 1.8f, 1.0f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    } else {
-	ImGui::Image((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
-	    ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), ImVec4(1.0f, 1.8f, 1.0f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    }
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddImage((void*)(intptr_t)currentPic->texture, ImVec2(x, y), ImVec2(x+pw,y+ph), ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0xffffffff);
 
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
-	vlcinteg.bifurcate();
+    //ImGui::Image((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
+	//ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), ImVec4(1.0f, 1.8f, 1.0f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    DropShadow(x, y, pw, ph);
+
+    /*if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+	vlc->bifurcate();
 	delete currentPic;
 	currentPic = NULL;
-    }
+    }*/
 
     ImGui::SetCursorPos(cp);
 
     ImGui::Button("Back to folder");
     if (currentPic != NULL && ImGui::IsItemClicked()) {
-	vlcinteg.bifurcate();
+	vlc->bifurcate();
 	delete currentPic;
 	currentPic = NULL;
     }
 
+    ImGui::EndChild();
 }
 
 int main(int argc, char *argv[]) {
@@ -267,6 +299,8 @@ int main(int argc, char *argv[]) {
     // Setup Dear ImGui style
     ImGui::StyleColorsLight();
     //ImGui::StyleColorsClassic();
+    //ImGuiStyle& style = ImGui::GetStyle();
+    //style.FrameBorderSize = 0.0f;
 
     // Setup Platform/Renderer bindings
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -275,6 +309,8 @@ int main(int argc, char *argv[]) {
     LoadTextureFromMemory(folder16x16, sizeof(folder16x16), &Folder16Tex);
     LoadTextureFromMemory(folder64x64, sizeof(folder64x64), &Folder64Tex);
     LoadTextureFromMemory(loading, sizeof(loading), &LoadingTex);
+
+    vlc = new VLCLibIntegration();
 
     loadAPic = NULL;
     currentPic = NULL;
@@ -310,7 +346,7 @@ int main(int argc, char *argv[]) {
 		break;
             case SDLK_ESCAPE:
 		if (currentPic != NULL) {
-		    vlcinteg.bifurcate();
+		    vlc->bifurcate();
 		    delete currentPic;
 		    currentPic = NULL;
 		}
@@ -324,7 +360,7 @@ int main(int argc, char *argv[]) {
 		break;
 	    case SDLK_LEFT:
 		if (currentPic != NULL && currentPic->prev != NULL) {
-		    vlcinteg.bifurcate();
+		    vlc->bifurcate();
 		    Pic *pic = new Pic(currentPic->prev);
 		    delete currentPic;
 		    currentPic = pic;
@@ -332,7 +368,7 @@ int main(int argc, char *argv[]) {
 		break;
 	    case SDLK_RIGHT:
 		if (currentPic != NULL && currentPic->next != NULL) {
-		    vlcinteg.bifurcate();
+		    vlc->bifurcate();
 		    Pic *pic = new Pic(currentPic->next);
 		    delete currentPic;
 		    currentPic = pic;
@@ -353,31 +389,33 @@ int main(int argc, char *argv[]) {
 	    ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
 
 	    ImGui::Begin("MiCasa Main", NULL,
-    		ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoFocusOnAppearing
+		ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoFocusOnAppearing
 		|ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
-		|ImGuiWindowFlags_NoMove | ImGuiWindowFlags_MenuBar);
+		|ImGuiWindowFlags_NoMove);
 
-	    if (ImGui::BeginMenuBar()) {
-		if (ImGui::BeginMenu("Menu")) {
-		    //ShowExampleMenuFile();
-		    ImGui::EndMenu();
+	    /*if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) == 0) {
+
+		if (ImGui::BeginMenuBar()) {
+		    if (ImGui::BeginMenu("Menu")) {
+			//ShowExampleMenuFile();
+			ImGui::EndMenu();
+		    }
+		    if (ImGui::BeginMenu("Tools")) {
+			/*ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
+			ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
+			ImGui::MenuItem("About Dear ImGui", NULL, &show_app_about);
+			ImGui::EndMenu();
+		    }
+		    ImGui::EndMenuBar();
 		}
-		if (ImGui::BeginMenu("Tools")) {
-		    /*ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
-		    ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
-		    ImGui::MenuItem("About Dear ImGui", NULL, &show_app_about);*/
-		    ImGui::EndMenu();
-		}
-		ImGui::EndMenuBar();
-	    }
+	    } else {
+	    }*/
 
 	    if (currentPic != NULL) {
-		ImGui::BeginChild("ScrollRegion3", ImVec2(0, 0), false);
 		//
 		// WHEN A PICTURE HAS BEEN CHOSEN
 		//
 		SingleChosenPic();
-		ImGui::EndChild();
 
 	    } else {
 
@@ -409,6 +447,15 @@ int main(int argc, char *argv[]) {
 		ImGui::EndChild();
 	    }
 	    ImGui::End();
+
+	    if (ImGui::IsMouseDoubleClicked(0)) {
+		if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+		    SDL_SetWindowFullscreen(window, 0);
+		} else {
+		    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+		}
+	    }
+
 	    folderClicked = false;
 
 	    frist = false;
@@ -422,6 +469,9 @@ int main(int argc, char *argv[]) {
             SDL_GL_SwapWindow(window);
 
 	    if (currentPic != NULL && currentPic->loaded == false) {
+		zoom_value = 64.0f;
+		zoomoffset_x = 0.0f;
+		zoomoffset_y = 0.0f;
 		currentPic->load();
 	    } else if (loadAPic != NULL) {
 		loadAPic->load();
@@ -436,6 +486,8 @@ int main(int argc, char *argv[]) {
     }
 
     delete folders;
+
+    delete vlc;
 
     if (Folder16Tex != 0) {
 	glDeleteTextures(1, &Folder16Tex);

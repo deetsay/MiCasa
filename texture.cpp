@@ -32,7 +32,7 @@ bool Fit2U(int *resultWidth, int *resultHeight, int width, int height, int limit
 }
 
 SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int limit_w, int limit_h) {
-    if (limit_w < 5 || limit_h < 5) {
+    if (limit_w < 1 || limit_h < 1) {
 	return NULL;
     }
 
@@ -44,7 +44,7 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
     //std::cout << " w " << surface->w << " h " << surface->h << " limit " << limit << std::endl;
     //std::cout << " format " << SDL_GetPixelFormatName(surface->format->format) << std::endl; 
 
-    Fit2U(width, height, surface->w, surface->h, limit_w-4, limit_h-4, true);
+    Fit2U(width, height, surface->w, surface->h, limit_w, limit_h, true);
 
     SDL_Rect targetDimensions;
     targetDimensions.x = 0;
@@ -53,8 +53,8 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
     targetDimensions.h = *height;
 
     SDL_Surface *p32BPPSurface = SDL_CreateRGBSurfaceWithFormat(0,
-	*width + 4,
-	*height + 4,
+	*width,
+	*height,
 	32,
 	SDL_PIXELFORMAT_ABGR8888);
     if (p32BPPSurface == NULL) {
@@ -68,7 +68,7 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
     if (SDL_MUSTLOCK(p32BPPSurface)) {
 	SDL_LockSurface(p32BPPSurface);
     }
-    targetDimensions.x = 4; targetDimensions.y = 4;
+    /*targetDimensions.x = 4; targetDimensions.y = 4;
     SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 224, 224, 224, 255));
     targetDimensions.x = 3; targetDimensions.y = 3;
     SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 192, 192, 192, 255));
@@ -76,15 +76,16 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
     SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 160, 160, 160, 255));
     targetDimensions.x = 1; targetDimensions.y = 1;
     SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 128, 128, 128, 255));
-
     targetDimensions.x = 0; targetDimensions.y = 0;
+    */
+
     if (SDL_BlitScaled(surface, NULL, p32BPPSurface, &targetDimensions) < 0) {
 	std::cout << "Error! Did not blit surface: " << SDL_GetError() << std::endl;
     } else {
 	SDL_FreeSurface(surface);
 	surface = p32BPPSurface;
-	*width = surface->w;
-	*height = surface->h;
+	//*width = surface->w;
+	//*height = surface->h;
     }
     if (SDL_MUSTLOCK(p32BPPSurface)) {
 	SDL_UnlockSurface(p32BPPSurface);

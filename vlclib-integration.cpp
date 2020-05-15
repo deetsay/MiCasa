@@ -42,11 +42,15 @@ void VLCLibIntegration::integrate(Pic *pic) {
     if (mp == NULL) {
 	libvlc_media_t *m = libvlc_media_new_path(libvlc, pic->path->c_str());
 	mp = libvlc_media_player_new_from_media(m);
+	//libvlc_media_parse_with_options(m, libvlc_media_parse_network, 10);
+	//if (libvlc_media_get_parsed_status(m) != libvlc_media_parsed_status_done) {
+	//    std::cout << "LibVLC parse error!" << std::endl;
+	//}
 	libvlc_media_release(m);
 
-	if (!libvlc_media_is_parsed(m)) {
-	    libvlc_media_parse(m);
-	}
+	//if (!libvlc_media_is_parsed(m)) {
+	//    libvlc_media_parse(m);
+	//}
 	libvlc_video_get_size(mp, 0, (unsigned int *) (&(pic->width)), (unsigned int *) (&(pic->height)));
 
 	//std::cout << "w = " << currentPic->width << " h = " << currentPic->height << std::endl;
