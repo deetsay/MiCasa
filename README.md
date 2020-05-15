@@ -1,4 +1,4 @@
-Clone and build:
+Clone and build on Linux:
 
 ```
 git clone https://github.com/deetsay/MiCasa.git
@@ -10,6 +10,23 @@ ninja
 Or, if you want to keep the source directory a little cleaner:
 
 ```
+git clone https://github.com/deetsay/MiCasa.git
+cd MiCasa
+mkdir -p build
+cd build
+cmake ..
+ninja
+```
+
+Compilation was successful on OSX Catalina with commands including, but not
+necessarily limited to the following (currently experiencing inconveniences
+locating libvlc at runtime, negatively affecting ability to manifest moving
+pictures):
+
+```
+brew install sdl2
+brew install sdl2_image
+brew cask install vlc
 git clone https://github.com/deetsay/MiCasa.git
 cd MiCasa
 mkdir -p build
