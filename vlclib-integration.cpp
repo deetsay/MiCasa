@@ -1,8 +1,6 @@
 #include "vlclib-integration.h"
 
-#include <stdlib.h>
 #include <iostream>
-#include <assert.h>
 
 #include "texture.h"
 
@@ -26,20 +24,30 @@ VLCLibIntegration::VLCLibIntegration() {
     // with the executable or libvlc_new() will not work!
     //printf("VLC_PLUGIN_PATH=%s\n", getenv("VLC_PLUGIN_PATH"));
 
+    #ifdef __APPLE__
+        if (getenv("VLC_PLUGIN_PATH") == NULL) {
+	    setenv("VLC_PLUGIN_PATH", "/Applications/VLC.app/Contents/MacOS/plugins", true);
+	};
+    #endif
     const char *vlc_argv[] = {
-	"--no-xlib"	// Don't use Xlib.
+	"--no-xlib",
+	"-I", "dummy",
+	"--ignore-config"
     };
     const int vlc_argc = 1;
 
     // Initialise libVLC.
     libvlc = libvlc_new(vlc_argc, vlc_argv);
     if (libvlc == NULL) {
-	std::cout << "LibVLC initialization failure." << std::endl;
+	std::cout << "LibVLC initialization failed!" << std::endl;
     }
 }
 
 void VLCLibIntegration::integrate(Pic *pic) {
     if (mp == NULL) {
+	if (libvlc == NULL) {
+	    return;
+	}
 	libvlc_media_t *m = libvlc_media_new_path(libvlc, pic->path->c_str());
 	mp = libvlc_media_player_new_from_media(m);
 	//libvlc_media_parse_with_options(m, libvlc_media_parse_network, 10);
@@ -88,5 +96,7 @@ void VLCLibIntegration::bifurcate() {
 VLCLibIntegration::~VLCLibIntegration() {
     bifurcate();
 
-    libvlc_release(libvlc);
+    if (libvlc != NULL) {
+	libvlc_release(libvlc);
+    }
 }

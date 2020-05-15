@@ -352,7 +352,7 @@ int main(int argc, char *argv[]) {
 		}
                 break;
 	    case SDLK_f:
-		if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+		if ((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0) {
 		    SDL_SetWindowFullscreen(window, 0);
 		} else {
 		    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -401,7 +401,7 @@ int main(int argc, char *argv[]) {
 			ImGui::EndMenu();
 		    }
 		    if (ImGui::BeginMenu("Tools")) {
-			/*ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
+			ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
 			ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
 			ImGui::MenuItem("About Dear ImGui", NULL, &show_app_about);
 			ImGui::EndMenu();
@@ -449,7 +449,7 @@ int main(int argc, char *argv[]) {
 	    ImGui::End();
 
 	    if (ImGui::IsMouseDoubleClicked(0)) {
-		if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+		if ((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0) {
 		    SDL_SetWindowFullscreen(window, 0);
 		} else {
 		    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);

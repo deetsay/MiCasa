@@ -144,7 +144,7 @@ bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int 
     SDL_Surface *surface = IMG_Load(filename);
     if (surface == NULL) {
 	std::cout << "Unable to load image '" << filename << "' ! SDL_image Error: " << IMG_GetError() << std::endl;
-	return NULL;
+	return false;
     }
     return SurfaceToTexture(surface, texture);
 }

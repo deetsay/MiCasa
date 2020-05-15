@@ -7,7 +7,7 @@ cmake
 ninja
 ```
 
-Or, if you want to keep the source directory a little cleaner:
+OR if you want to keep the source directory slightly cleaner:
 
 ```
 git clone https://github.com/deetsay/MiCasa.git
