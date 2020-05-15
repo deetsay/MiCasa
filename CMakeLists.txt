@@ -10,6 +10,8 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
 include(FindPkgConfig)
 include(CPack)
 include(InstallRequiredSystemLibraries)
@@ -49,9 +51,10 @@ list(APPEND LIBS ${OPENGL_LIBRARIES})
 
 ######################################################## Everything VLC
 
-pkg_search_module(LIBVLC REQUIRED libvlc)
-list(APPEND INCLUDES ${LIBVLC_INCLUDE_DIRS})
-list(APPEND LIBS ${LIBVLC_LIBRARIES})
+#pkg_search_module(LIBVLC REQUIRED libvlc)
+find_package(LIBVLC REQUIRED)
+list(APPEND INCLUDES ${LIBVLC_INCLUDE_DIR})
+list(APPEND LIBS ${LIBVLC_LIBRARY})
 
 ########################################################## Build config
 
