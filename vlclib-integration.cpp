@@ -48,7 +48,8 @@ void VLCLibIntegration::integrate(Pic *pic) {
 	if (libvlc == NULL) {
 	    return;
 	}
-	libvlc_media_t *m = libvlc_media_new_path(libvlc, pic->path->c_str());
+	std::string path = pic->path->string();
+	libvlc_media_t *m = libvlc_media_new_path(libvlc, path.c_str());
 	mp = libvlc_media_player_new_from_media(m);
 	//libvlc_media_parse_with_options(m, libvlc_media_parse_network, 10);
 	//if (libvlc_media_get_parsed_status(m) != libvlc_media_parsed_status_done) {
@@ -63,7 +64,9 @@ void VLCLibIntegration::integrate(Pic *pic) {
 
 	//std::cout << "w = " << currentPic->width << " h = " << currentPic->height << std::endl;
 
-	pixels = new (std::align_val_t(32)) char[pic->width * pic->height * 4]();
+	//pixels = (char *) operator new[](sizeof(char) * pic->width * pic->height * 4, (std::align_val_t)(32));
+	//pixels = new (std::align_val_t(32)) char[pic->width * pic->height * 4]();
+	pixels = new char[pic->width * pic->height * 4]();
 	CreateNewTexture(&(pic->texture), GL_RGBA, pic->width, pic->height, (void *) pixels);
 	pic->reallyLoaded = true;
 

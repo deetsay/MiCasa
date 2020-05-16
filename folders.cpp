@@ -51,7 +51,7 @@ Folder::Folder(Folders *folders, fs::path path) {
     for (const fs::directory_entry &entry : fs::directory_iterator(*this->path)) {
 	if (fs::is_regular_file(entry)) {
 	    std::smatch pic_match;
-	    std::string picname = entry.path().filename();
+	    std::string picname = entry.path().filename().string();
 	    if (std::regex_match(picname, pic_match, pic_regex)) {
 		this->hasPictures = true;
 		break;
@@ -78,7 +78,7 @@ void Folder::load(int limit_w, int limit_h, GLuint placeholder, int placeholder_
     for (const fs::directory_entry &entry : fs::directory_iterator(*this->path)) {
 	if (fs::is_regular_file(entry)) {
 	    std::smatch pic_match;
-	    std::string picname = entry.path().filename();
+	    std::string picname = entry.path().filename().string();
 	    if (std::regex_match(picname, pic_match, pic_regex)) {
 		new Pic(this, entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h);
 	    }
@@ -134,7 +134,7 @@ Pic::Pic(Folder *folder, fs::path path, int limit_w, int limit_h, GLuint placeho
     this->height = placeholder_h;
 
     std::smatch vid_match;
-    std::string picname = path.filename();
+    std::string picname = path.filename().string();
     this->isVideo = std::regex_match(picname, vid_match, vid_regex);
 }
 

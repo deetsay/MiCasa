@@ -12,7 +12,7 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
-include(FindPkgConfig)
+#include(FindPkgConfig)
 include(CPack)
 include(InstallRequiredSystemLibraries)
 
@@ -58,10 +58,10 @@ list(APPEND SOURCES ${IMGUI_DIR}/imgui_widgets.cpp)
 
 ############################################################### Everything SDL2
 
-pkg_search_module(SDL2 REQUIRED sdl2)
-pkg_search_module(SDL2IMAGE REQUIRED SDL2_image)
-list(APPEND INCLUDES ${SDL2_INCLUDE_DIRS} ${SDL2IMAGE_INCLUDE_DIRS})
-list(APPEND LIBS ${SDL2_LIBRARIES} ${SDL2IMAGE_LIBRARIES})
+find_package(SDL2 REQUIRED)
+find_package(SDL2_image REQUIRED)
+list(APPEND INCLUDES ${SDL2_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS})
+list(APPEND LIBS ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
 
 ############################################################# Everything OpenGL
 
@@ -72,7 +72,6 @@ list(APPEND LIBS ${OPENGL_LIBRARIES})
 
 ################################################################ Everything VLC
 
-#pkg_search_module(LIBVLC REQUIRED libvlc)
 find_package(LIBVLC REQUIRED)
 list(APPEND INCLUDES ${LIBVLC_INCLUDE_DIR})
 list(APPEND LIBS ${LIBVLC_LIBRARY})
