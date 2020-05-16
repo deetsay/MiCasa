@@ -1,9 +1,6 @@
 #pragma once
 
-#include "SDL.h"
 #include <mutex>
-#include "SDL_mutex.h"
-#include <SDL_opengl.h>
 
 #include "vlc/vlc.h"
 
