@@ -51,7 +51,7 @@ Pic *currentPic;
 Pic *loadAPic;
 bool folderClicked;
 
-void DropShadow(int x, int y, int w, int h) {
+void DropShadow(float x, float y, int w, int h) {
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->AddLine(ImVec2(x+w, y), ImVec2(x+w, y+h),  0xff666666, 1.0f);
     draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xff666666, 1.0f);
@@ -218,45 +218,63 @@ float zoomoffset_y;
 void SingleChosenPic() {
     ImGui::BeginChild("ScrollRegion3", ImVec2(0, 0), false);
 
-    ImGui::GetCurrentWindow()->ScrollMax.y = 1.0f;
-
-    zoom_value -= ImGui::GetIO().MouseWheel;
-    if (zoom_value < 1) {
-	zoom_value = 1;
-    }
-    if (zoom_value > 64) {
-	zoom_value = 64;
-    }
-
     int pw, ph;
-    int dw = ImGui::GetWindowContentRegionMax().x-4; //* 96 / 100;
-    int dh = ImGui::GetWindowContentRegionMax().y-4; //* 96 / 100;
+    float dw = ImGui::GetWindowContentRegionMax().x-4; //* 96 / 100;
+    float dh = ImGui::GetWindowContentRegionMax().y-4; //* 96 / 100;
 
     if (currentPic->isVideo == true) {
 	vlc->integrate(currentPic);
     }
+    float z = 64 / zoom_value;
 
-    Fit2U(&pw, &ph, currentPic->width, currentPic->height, dw*64/zoom_value, dh*64/zoom_value, true);
+    Fit2U(&pw, &ph, currentPic->width, currentPic->height, (int) dw*z, (int) dh*z, true);
     ImVec2 cp = ImGui::GetCursorScreenPos();
+    float mid_x = cp.x + (dw / 2);	// middle point of the "picture area"
+    float mid_y = cp.y + (dh / 2);
 
-    int x = cp.x + (dw - pw) / 2;
-    int y = cp.y + (dh - ph) / 2;
+    ImGuiIO& io = ImGui::GetIO();
+    float wheel = io.MouseWheel;
 
-    //ImGui::SetCursorScreenPos(ImVec2(x, y));
+    // While the wheel isn't being moved, don't move the picture
+    if (wheel != 0.0f) {
+	//
+	// ZOOM OFFSET CALCULATION
+	//
+	// enforce zoom limits
+	float zoom_temp = zoom_value;
+	zoom_value -= wheel;
+	if (zoom_value < 1.0f) {
+	    zoom_value = 1.0f;
+	} else if (zoom_value > 64.0f) {
+	    zoom_value = 64.0f;
+	}
+	zoom_temp -= zoom_value;
+	
+	if (zoom_temp < 0.0f) {
+
+	    zoomoffset_x += (zoomoffset_x * zoom_temp) / 16;
+	    zoomoffset_y += (zoomoffset_y * zoom_temp) / 16;
+
+	} else if (zoom_temp > 0.0f) {
+
+	    // difference from center to mouse
+	    float mx = mid_x - io.MousePos.x;
+	    float my = mid_y - io.MousePos.y;
+	    zoomoffset_x += mx * zoom_temp * z / 16;
+	    zoomoffset_y += my * zoom_temp * z / 16;
+	}
+    }
+
+    float x = mid_x - (pw / 2) + zoomoffset_x;
+    float y = mid_y - (ph / 2) + zoomoffset_y;
 
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->AddImage((void*)(intptr_t)currentPic->texture, ImVec2(x, y), ImVec2(x+pw,y+ph), ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0xffffffff);
-
-    //ImGui::Image((void*)(intptr_t)currentPic->texture, ImVec2(pw,ph),
-	//ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), ImVec4(1.0f, 1.8f, 1.0f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
     DropShadow(x, y, pw, ph);
 
-    /*if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
-	vlc->bifurcate();
-	delete currentPic;
-	currentPic = NULL;
-    }*/
-
+    //
+    // OVERLAY
+    //
     ImGui::SetCursorPos(cp);
 
     ImGui::Button("Back to folder");
