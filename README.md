@@ -34,3 +34,6 @@ cd build
 cmake ..
 ninja
 ```
+
+&copy; Tero Mäyränen 2020
+License: [GPLv2]{https://github.com/deetsay/MiCasa}

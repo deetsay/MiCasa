@@ -4,15 +4,15 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  message(STATUS "Setting build type to 'Release' as none was specified.")
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+	message(STATUS "Setting build type to 'Release' as none was specified.")
+	set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
-#include(FindPkgConfig)
+include(FindPkgConfig)
 include(CPack)
 include(InstallRequiredSystemLibraries)
 
@@ -24,27 +24,6 @@ configure_file(micasa-config.h.in micasa-config.h)
 
 list(APPEND SOURCES main.cpp folders.cpp texture.cpp)
 list(APPEND SOURCES vlclib-integration.cpp)
-
-################ RPATH stuff for OSX, hope it doesn't interfere with other OSes
-# MAY have been unnecessary after all
-## use, i.e. don't skip the full RPATH for the build tree
-#set(CMAKE_SKIP_BUILD_RPATH FALSE)
-#
-## when building, don't use the install RPATH already
-## (but later on when installing)
-#set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-#
-#set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-#
-## add the automatically determined parts of the RPATH
-## which point to directories outside the build tree to the install RPATH
-#set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-#
-## the RPATH to be used when installing, but only if it's not a system directory
-#list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-#if("${isSystemDir}" STREQUAL "-1")
-#    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-#endif("${isSystemDir}" STREQUAL "-1")
 
 ############################################################## Everything ImGui
 
@@ -58,10 +37,17 @@ list(APPEND SOURCES ${IMGUI_DIR}/imgui_widgets.cpp)
 
 ############################################################### Everything SDL2
 
-find_package(SDL2 REQUIRED)
-find_package(SDL2_image REQUIRED)
-list(APPEND INCLUDES ${SDL2_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS})
-list(APPEND LIBS ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
+if(PKG_CONFIG_FOUND)
+	pkg_search_module(SLD2 REQUIRED sdl2)
+	pkg_search_module(SLD2IMAGE REQUIRED SDL2_image)
+	list(APPEND INCLUDES ${SLD2_INCLUDE_DIRS} ${SDL2IMAGE_INCLUDE_DIRS})
+	list(APPEND LIBS ${SDL2_LIBRARIES} ${SLD2IMAGE_LIBRARIES})
+else()
+	find_package(SDL2 REQUIRED)
+	find_package(SDL2_image REQUIRED)
+	list(APPEND INCLUDES ${SDL2_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS})
+	list(APPEND LIBS ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
+endif()
 
 ############################################################# Everything OpenGL
 
@@ -72,9 +58,15 @@ list(APPEND LIBS ${OPENGL_LIBRARIES})
 
 ################################################################ Everything VLC
 
-find_package(LIBVLC REQUIRED)
-list(APPEND INCLUDES ${LIBVLC_INCLUDE_DIR})
-list(APPEND LIBS ${LIBVLC_LIBRARY})
+if(PKG_CONFIG_FOUND AND NOT APPLE)
+	pkg_search_module(LIBVLC REQUIRED libvlc)
+	list(APPEND INCLUDES ${LIBVLC_INCLUDE_DIRS})
+	list(APPEND LIBS ${LIBVLC_LIBRARIES})
+else()
+	find_package(LIBVLC REQUIRED)
+	list(APPEND INCLUDES ${LIBVLC_INCLUDE_DIR})
+	list(APPEND LIBS ${LIBVLC_LIBRARY})
+endif()
 
 ################################################################## Build config
 
@@ -82,12 +74,12 @@ add_executable(micasa ${SOURCES})
 target_link_libraries(micasa PUBLIC ${LIBS})
 target_include_directories(micasa PUBLIC ${PROJECT_BINARY_DIR} ${INCLUDES})
 
-if (CMAKE_BUILD_TYPE STREQUAL Release)
-  add_custom_command(
-    TARGET micasa POST_BUILD
-    COMMAND ${CMAKE_STRIP} micasa
-  )
-endif ()
+if(CMAKE_BUILD_TYPE STREQUAL Release)
+	add_custom_command(
+		TARGET micasa POST_BUILD
+		COMMAND ${CMAKE_STRIP} micasa
+	)
+endif()
 
 ################################################################ Install config
 
