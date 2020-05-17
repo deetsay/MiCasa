@@ -8,7 +8,7 @@ bool LoadPreviewTextureFromFile(const char *filename, GLuint *texture, int *widt
 
 void LoadTextureFromMemory(const void *data, int size, GLuint *texture);
 
-void Fit2U(int *resultWidth, int *resultHeight, int width, int height, int limit_w, int limit_h, bool stretch);
+bool Fit2U(int *resultWidth, int *resultHeight, int width, int height, int limit_w, int limit_h, bool stretch);
 
 void CreateNewTexture(GLuint *texture, int mode, int width, int height, void *pixels);
 
