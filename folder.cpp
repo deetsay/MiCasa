@@ -1,4 +1,4 @@
-#include "folders.h"
+#include "folder.h"
 #include <filesystem>
 #include <iostream>
 #include <regex>
@@ -12,98 +12,101 @@ const std::regex pic_regex("^[^\\.].*\\.(jpg|jpeg|gif|png|mpg|mp4|avi|3gp)$", st
 
 const std::regex vid_regex("^[^\\.].*\\.(mpg|mp4|avi|3gp)$", std::regex_constants::icase);
 
-Folders::Folders(char *pathC) {
-    this->first = NULL;
-    this->last = NULL;
-    if (pathC == NULL) {
-	new Folder(this, fs::current_path());
+void Folder::addChild(Folder *folder) {
+    if (this->firstBorn == NULL) {
+	this->firstBorn = folder;
+	return;
+    }
+    if (strcmp(folder->path->filename().c_str(), this->firstBorn->path->filename().c_str()) < 0) {
+	folder->next = this->firstBorn;
+	this->firstBorn = folder;
     } else {
-	new Folder(this, fs::path(pathC));
+	Folder *lastChild = this->firstBorn;
+	Folder *child = lastChild->next;
+	while (child != NULL) {
+	    if (strcmp(folder->path->filename().c_str(), child->path->filename().c_str()) < 0) {
+		folder->next = child;
+		lastChild->next = folder;
+		return;
+	    }
+	    lastChild = child;
+	    child = child->next;
+	}
+	lastChild->next = folder;
     }
 }
 
-Folders::~Folders() {
-    Folder *folder = this->first;
-    while (folder != NULL) {
-	Folder *next = folder->next;
-	delete folder;
-	folder = next;
-    }
-}
-
-Folder::Folder(Folders *folders, fs::path path) {
-    this->next = NULL;
-    this->prev = folders->last;
+Folder::Folder(fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
     this->path = new fs::path(path);
-    if (folders->last == NULL) {
-	folders->first = this;
-    } else {
-	folders->last->next = this;
-    }
-    folders->last = this;
+    this->next = NULL;
+    this->firstBorn = NULL;
     this->firstPic = NULL;
-    this->lastPic = NULL;
 
     //std::cout << "Folder created for " << path << std::endl;
-    this->hasPictures = false;
-    this->loaded = false;
 
-    for (const fs::directory_entry &entry : fs::directory_iterator(*this->path)) {
+    Pic *lastPic = NULL;
+    for (const fs::directory_entry &entry : fs::directory_iterator(path)) {
+	if (fs::is_directory(entry)) {
+	    Folder *child = new Folder(entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h);
+	    if (child->anyChildHasPictures()) {
+		addChild(child);
+	    } else {
+		delete child; // Not everybody deserves to make it to the Valley Beyond
+	    }
+    	}
 	if (fs::is_regular_file(entry)) {
 	    std::smatch pic_match;
 	    std::string picname = entry.path().filename().string();
 	    if (std::regex_match(picname, pic_match, pic_regex)) {
-		this->hasPictures = true;
-		break;
+		Pic *pic = new Pic(this, lastPic, entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h);
+		if (lastPic == NULL) {
+		    this->firstPic = pic;
+		} else {
+		    lastPic->next = pic;
+		}
+		lastPic = pic;
 	    }
 	}
-    }
-
-    for (const fs::directory_entry &entry : fs::directory_iterator(path)) {
-	if (fs::is_directory(entry)) {
-	    new Folder(folders, entry.path());
-    	}
     }
 }
 
 Folder::~Folder() {
-    unload();
     delete this->path;
-}
 
-void Folder::load(int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
-    if (this->loaded == true) {
-	return;
-    }
-    for (const fs::directory_entry &entry : fs::directory_iterator(*this->path)) {
-	if (fs::is_regular_file(entry)) {
-	    std::smatch pic_match;
-	    std::string picname = entry.path().filename().string();
-	    if (std::regex_match(picname, pic_match, pic_regex)) {
-		new Pic(this, entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h);
-	    }
-	}
-    }
-    this->loaded = true;
-}
-
-void Folder::unload() {
     Pic *pic = this->firstPic;
     while (pic != NULL) {
 	Pic *next = pic->next;
 	delete pic;
 	pic = next;
     }
-    this->firstPic = NULL;
-    this->lastPic = NULL;
-    this->loaded = false;
+
+    Folder *child = this->firstBorn;
+    while (child != NULL) {
+	Folder *next = child->next;
+	delete child;
+	child = next;
+    }
+}
+
+bool Folder::anyChildHasPictures() {
+    if (this->firstPic != NULL) {
+	return true;
+    }
+    Folder *child = this->firstBorn;
+    while (child != NULL) {
+	if (child->anyChildHasPictures() == true) {
+	    return true;
+	}
+	child = child->next;
+    }
+    return false;
 }
 
 Pic::Pic(Pic *pic) {
+    this->path = new fs::path(pic->path->string());
     this->isPreview = false;
     this->next = pic->next;
     this->prev = pic->prev;
-    this->path = pic->path;
     this->loaded = false;
     this->reallyLoaded = false;
     this->texture = pic->texture;
@@ -112,19 +115,13 @@ Pic::Pic(Pic *pic) {
     this->isVideo = pic->isVideo;
 }
 
-Pic::Pic(Folder *folder, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
+Pic::Pic(Folder *folder, Pic *previous, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
+    this->path = new fs::path(path);
     this->isPreview = true;
     this->next = NULL;
-    this->prev = folder->lastPic;
-    this->path = new fs::path(path);
+    this->prev = previous;
     this->limit_w = limit_w;
     this->limit_h = limit_h;
-    if (folder->lastPic == NULL) {
-	folder->firstPic = this;
-    } else {
-	folder->lastPic->next = this;
-    }
-    folder->lastPic = this;
 
     this->loaded = false;
     this->reallyLoaded = false;
@@ -139,6 +136,8 @@ Pic::Pic(Folder *folder, fs::path path, int limit_w, int limit_h, GLuint placeho
 }
 
 Pic::~Pic() {
+    delete this->path;
+
     if (this->reallyLoaded == true) {
 	glDeleteTextures(1, &(this->texture));
     }

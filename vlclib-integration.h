@@ -4,7 +4,7 @@
 
 #include "vlc/vlc.h"
 
-#include "folders.h"
+#include "folder.h"
 
 class VLCLibIntegration {
 private:

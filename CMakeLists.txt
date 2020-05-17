@@ -21,7 +21,7 @@ project(micasa VERSION 0.1)
 
 configure_file(micasa-config.h.in micasa-config.h)
 
-list(APPEND SOURCES main.cpp folders.cpp texture.cpp)
+list(APPEND SOURCES main.cpp folder.cpp texture.cpp)
 list(APPEND SOURCES vlclib-integration.cpp)
 
 ############################################################## Everything ImGui

@@ -32,7 +32,7 @@
 #include "imgui_impl_opengl2.h"
 #include "vlc/vlc.h"
 #include "texture.h"
-#include "folders.h"
+#include "folder.h"
 #include "vlclib-integration.h"
 
 #include "resources/roboto-medium.c"
@@ -45,7 +45,7 @@ GLuint Folder64Tex = 0;
 GLuint LoadingTex = 0;
 
 VLCLibIntegration *vlc;
-Folders *folders;
+Folder *rootFolder;
 Folder *currentFolder;
 Pic *currentPic;
 Pic *loadAPic;
@@ -66,11 +66,9 @@ void DropShadow(float x, float y, int w, int h) {
     draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xffcccccc, 1.0f);
 }
 
-void FoldersOnTheLeft() {
-    ImGui::TextUnformatted("Folders");
-    Folder *folder = folders->first;
+void FoldersOnTheLeft(Folder *folder) {
     while (folder != NULL) {
-	if (folder->hasPictures == true) {
+	if (folder->firstPic != NULL) {
 	    //
 	    //	FOLDER WITH PICTURES -- clickable
 	    //
@@ -83,9 +81,6 @@ void FoldersOnTheLeft() {
 		    delete currentPic;
 		    currentPic = NULL;
 		}
-		//if (currentFolder != NULL) {
-		//    currentFolder->unload();
-		//}
 		folderClicked = true;
 		currentFolder = folder;
 	    }
@@ -103,14 +98,14 @@ void FoldersOnTheLeft() {
 	    ImGui::SameLine();
 	    ImGui::TextUnformatted("");
 	}
+	FoldersOnTheLeft(folder->firstBorn);
 	folder = folder->next;
     }
 }
 
-void PhotoStreamOnTheRight() {
-    Folder *folder = folders->first;
-    int limit_w = (int) ImGui::GetWindowContentRegionMax().x/6;
-    int limit_h = limit_w*3/4;
+void PhotoStreamOnTheRight(Folder *folder, int limit_w, int limit_h) {
+    //int limit_w = (int) ImGui::GetWindowContentRegionMax().x/6;
+    //int limit_h = limit_w*3/4;
     while (folder != NULL) {
 	// Instead of drawing items and then asking ImGui::IsItemVisible(),
 	// use a miscellaneous combination of:
@@ -127,9 +122,9 @@ void PhotoStreamOnTheRight() {
 	    std::string s = folder->path->string();
 	    ImGui::TextUnformatted(s.c_str());
 
-	    if (folder->loaded == false) {
-		folder->load(limit_w, limit_h, LoadingTex, limit_w, limit_h);
-	    }
+	    //if (folder->loaded == false) {
+		//folder->load(limit_w, limit_h, LoadingTex, limit_w, limit_h);
+	    //}
 	    ImGui::NextColumn();
 
 	} else {
@@ -207,6 +202,7 @@ void PhotoStreamOnTheRight() {
 		ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), ImGui::GetCursorPosY()+limit_h));
 	    }
 	}
+	PhotoStreamOnTheRight(folder->firstBorn, limit_w, limit_h);
 	folder = folder->next;
     }
 }
@@ -337,8 +333,8 @@ int main(int argc, char *argv[]) {
     bool frist = true;
     bool done = false;
 
-    folders = new Folders(argc >= 1 ? argv[1] : NULL);
-
+    rootFolder = new Folder(argc < 2 ? fs::current_path() : fs::path(argv[1]), 128, 96, LoadingTex, 128, 96);
+    
     // Main loop
     while (!done)
     {
@@ -445,7 +441,8 @@ int main(int argc, char *argv[]) {
 		//
 		//	FOLDERS on the LEFT
 		//
-		FoldersOnTheLeft();
+		ImGui::TextUnformatted("Folders");
+		FoldersOnTheLeft(rootFolder);
 		ImGui::EndChild();
 
 		loadAPic = NULL;
@@ -461,7 +458,9 @@ int main(int argc, char *argv[]) {
 		// WHEN NO PICTURE HAS BEEN CHOSEN
 		// (=PHOTO STREAM)
 		//
-		PhotoStreamOnTheRight();
+		int limit_w = (int) ImGui::GetWindowContentRegionMax().x/6;
+		int limit_h = limit_w*3/4;
+		PhotoStreamOnTheRight(rootFolder, limit_w, limit_h);
 		ImGui::EndChild();
 	    }
 	    ImGui::End();
@@ -503,7 +502,7 @@ int main(int argc, char *argv[]) {
 	currentPic = NULL;
     }
 
-    delete folders;
+    delete rootFolder;
 
     delete vlc;
 
