@@ -13,6 +13,7 @@ class Folder {
 
 private:
     void addChild(Folder *folder);
+    void addPic(Pic *pic);
 
 public:
     fs::path *path;
@@ -47,7 +48,7 @@ public:
     GLuint placeholder;
 
     Pic(Pic *pic);
-    Pic(Folder *folder, Pic *previous, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h);
+    Pic(Folder *folder, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h);
     virtual ~Pic();
 
     void load();

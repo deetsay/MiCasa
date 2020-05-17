@@ -17,23 +17,51 @@ void Folder::addChild(Folder *folder) {
 	this->firstBorn = folder;
 	return;
     }
-    if (strcmp(folder->path->filename().c_str(), this->firstBorn->path->filename().c_str()) < 0) {
+    if (strcmp(folder->path->filename().c_str(), this->firstBorn->path->filename().c_str()) > 0) {
 	folder->next = this->firstBorn;
 	this->firstBorn = folder;
-    } else {
-	Folder *lastChild = this->firstBorn;
-	Folder *child = lastChild->next;
-	while (child != NULL) {
-	    if (strcmp(folder->path->filename().c_str(), child->path->filename().c_str()) < 0) {
-		folder->next = child;
-		lastChild->next = folder;
-		return;
-	    }
-	    lastChild = child;
-	    child = child->next;
-	}
-	lastChild->next = folder;
+	return;
     }
+    Folder *lastChild = this->firstBorn;
+    Folder *child = lastChild->next;
+    while (child != NULL) {
+	if (strcmp(folder->path->filename().c_str(), child->path->filename().c_str()) > 0) {
+	    folder->next = child;
+	    lastChild->next = folder;
+	    return;
+	}
+	lastChild = child;
+	child = child->next;
+    }
+    lastChild->next = folder;
+}
+
+void Folder::addPic(Pic *newPic) {
+    if (this->firstPic == NULL) {
+	this->firstPic = newPic;
+	return;
+    }
+    if (strcmp(newPic->path->filename().c_str(), this->firstPic->path->filename().c_str()) < 0) {
+	newPic->next = this->firstPic;
+	this->firstPic->prev = newPic;
+	this->firstPic = newPic;
+	return;
+    }
+    Pic *lastPic = this->firstPic;
+    Pic *pic = lastPic->next;
+    while (pic != NULL) {
+	if (strcmp(newPic->path->filename().c_str(), pic->path->filename().c_str()) < 0) {
+	    newPic->next = pic;
+	    pic->prev = newPic;
+	    newPic->prev = lastPic;
+	    lastPic->next = newPic;
+	    return;
+	}
+	lastPic = pic;
+	pic = pic->next;
+    }
+    newPic->prev = lastPic;
+    lastPic->next = newPic;
 }
 
 Folder::Folder(fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
@@ -44,7 +72,6 @@ Folder::Folder(fs::path path, int limit_w, int limit_h, GLuint placeholder, int 
 
     //std::cout << "Folder created for " << path << std::endl;
 
-    Pic *lastPic = NULL;
     for (const fs::directory_entry &entry : fs::directory_iterator(path)) {
 	if (fs::is_directory(entry)) {
 	    Folder *child = new Folder(entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h);
@@ -58,13 +85,7 @@ Folder::Folder(fs::path path, int limit_w, int limit_h, GLuint placeholder, int 
 	    std::smatch pic_match;
 	    std::string picname = entry.path().filename().string();
 	    if (std::regex_match(picname, pic_match, pic_regex)) {
-		Pic *pic = new Pic(this, lastPic, entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h);
-		if (lastPic == NULL) {
-		    this->firstPic = pic;
-		} else {
-		    lastPic->next = pic;
-		}
-		lastPic = pic;
+		addPic(new Pic(this, entry.path(), limit_w, limit_h, placeholder, placeholder_w, placeholder_h));
 	    }
 	}
     }
@@ -115,11 +136,11 @@ Pic::Pic(Pic *pic) {
     this->isVideo = pic->isVideo;
 }
 
-Pic::Pic(Folder *folder, Pic *previous, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
+Pic::Pic(Folder *folder, fs::path path, int limit_w, int limit_h, GLuint placeholder, int placeholder_w, int placeholder_h) {
     this->path = new fs::path(path);
     this->isPreview = true;
     this->next = NULL;
-    this->prev = previous;
+    this->prev = NULL;
     this->limit_w = limit_w;
     this->limit_h = limit_h;
 
