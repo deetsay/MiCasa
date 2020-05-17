@@ -84,7 +84,7 @@ endif()
 
 install(TARGETS micasa
 	RUNTIME DESTINATION bin)
-install(FILES "${PROJECT_BINARY_DIR}/micasa-config.h" DESTINATION include)
+#install(FILES "${PROJECT_BINARY_DIR}/micasa-config.h" DESTINATION include)
 
 set(CPACK_GEERATOR "TGZ;DEB")
 set(CPACK_PACKAGE_NAME "micasa")
