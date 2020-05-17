@@ -18,6 +18,23 @@ cmake ..
 ninja
 ```
 
+After a successful build you can run:
+
+```
+sudo ninja install
+```
+To copy the compiled program into /usr/local/bin.
+
+Or turn it into a package of your choosing:
+
+```
+cpack -G DEB
+```
+
+```
+cpack -G RPM
+```
+
 Compilation was successful on OSX Catalina with commands including, but not
 necessarily limited to the following (currently experiencing inconveniences
 locating libvlc at runtime, negatively affecting ability to manifest moving

@@ -13,7 +13,6 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 include(FindPkgConfig)
-include(CPack)
 include(InstallRequiredSystemLibraries)
 
 ################################################################ Project config
@@ -87,8 +86,25 @@ install(TARGETS micasa
 	RUNTIME DESTINATION bin)
 install(FILES "${PROJECT_BINARY_DIR}/micasa-config.h" DESTINATION include)
 
+set(CPACK_GEERATOR "TGZ;DEB")
+set(CPACK_PACKAGE_NAME "micasa")
+set(CPACK_PACKAGE_VENDOR "Tero Mäyränen")
+set(CPACK_PACKAGE_CONTACT "tero@tero.fi")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Mi Casa is a home media browser")
+#set(CPACK_PACKAGE_DESCRIPTION_FILE "")
+#set(CPACK_RESOURCE_FILE_WELCOME "")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_VERSION_MAJOR "${micasa_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${micasa_VERSION_MINOR}")
+set(CPACK_SOURCE_GENERATOR "STGZ")
+set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}_Source.tar.gz")
+set(CPACK_SOURCE_IGNORE_FILES "/build/;.git*")
+set(CPACK_SOURCE_PACKAGE_FILE_NAME
+	"${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
+set(CPACK_VERBATIM_VARIABLES true)
+
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS true)
+include (CPack)
 
 ###############################################################################
