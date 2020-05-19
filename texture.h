@@ -1,15 +1,27 @@
 #pragma once
 
+#include <SDL.h>
 #include <SDL_opengl.h>
+#include <SDL_image.h>
 
-bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int *height);
+class Texture {
+private:
+    SDL_Surface *Load_To_Size(const char *filename, int limit_w, int limit_h);
+    void SurfaceToTexture(SDL_Surface *surface);
+    void InitFromPixels(void *pixels, int mode, int in_w, int in_h);
 
-bool LoadPreviewTextureFromFile(const char *filename, GLuint *texture, int *width, int *height, int limit_w, int limit_h);
+public:
+    GLuint texture;
+    unsigned short width;
+    unsigned short height;
 
-void LoadTextureFromMemory(const void *data, int size, GLuint *texture);
+    Texture(const char *filename);
+    Texture(const char *filename, int limit_w, int limit_h);
+    Texture(const void *data, int size);
+    Texture(void *pixels, int mode, int in_w, int in_h);
+    virtual ~Texture();
 
-bool Fit2U(int *resultWidth, int *resultHeight, int width, int height, int limit_w, int limit_h, bool stretch);
+    bool Fit(int *result_w, int *result_h, int limit_w, int limit_h);
 
-void CreateNewTexture(GLuint *texture, int mode, int width, int height, void *pixels);
-
-void UpdateTexture(GLuint *texture, int mode, int width, int height, void *pixels);
+    void Update(void *pixels, int mode);
+};

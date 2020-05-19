@@ -1,9 +1,7 @@
 #pragma once
 
 #include <mutex>
-
 #include "vlc/vlc.h"
-
 #include "folder.h"
 
 class VLCLibIntegration {
@@ -12,13 +10,17 @@ private:
     libvlc_media_player_t *mp;
 
 public:
+    int width;
+    int height;
+
     std::mutex mutex;
     char *pixels;
 
     VLCLibIntegration();
     ~VLCLibIntegration();
 
-    void integrate(Pic *pic);
+    Texture *integrationPreparation(const char *path);
+    void integrate(Texture *texture);
     void bifurcate();
 };
 

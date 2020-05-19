@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <list>
 #include <mutex>
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -40,18 +41,105 @@
 #include "resources/folder64x64.c"
 #include "resources/loading.c"
 
-GLuint Folder16Tex = 0;
-GLuint Folder64Tex = 0;
-GLuint LoadingTex = 0;
+class MiCasa {
+private:
+    Texture *Folder16Tex;
+    Texture *Folder64Tex;
+    Texture *LoadingTex;
 
-VLCLibIntegration *vlc;
-Folder *rootFolder;
-Folder *currentFolder;
-Pic *currentPic;
-Pic *loadAPic;
-bool folderClicked;
+    VLCLibIntegration *vlc;
+    Folder *rootFolder;
+    Folder *miFolder;
+    PicNode *miPicNode;
+    Texture *miTexture;
+    Pic *load_it;
+    bool folderClicked;
+    bool frist;
 
-void DropShadow(float x, float y, int w, int h) {
+    int limit_w;
+    int limit_h;
+
+    float zoom_value;
+    float zoomoffset_x;
+    float zoomoffset_y;
+
+    void ExitSinglePicView();
+
+    void MoonlightShadow(float x, float y, int w, int h);
+    void FoldersOnTheLeft(Folder *folder);
+    void Photo(Folder *folder, Pic *pic);
+    void PhotoStreamOnTheRight(Folder *folder);
+    void SingleChosenPic();
+
+public:
+    bool done;
+
+    void KeyDown(int action);
+    void RenderWindow();
+    void LoadStuff();
+
+    MiCasa(char *folderName);
+    virtual ~MiCasa();
+};
+
+
+MiCasa::MiCasa(char *folderName) {
+    Folder16Tex = new Texture(folder16x16, sizeof(folder16x16));
+    Folder64Tex = new Texture(folder64x64, sizeof(folder64x64));
+    LoadingTex = new Texture(loading, sizeof(loading));
+
+    done = false;
+    load_it = NULL;
+    miPicNode = NULL;
+    miTexture = NULL;
+    miFolder = NULL;
+    folderClicked = false;
+    frist = true;
+
+    rootFolder = new Folder(folderName == NULL ? fs::current_path() : fs::path(folderName));
+
+    vlc = new VLCLibIntegration();
+}
+
+void MiCasa::ExitSinglePicView() {
+    vlc->bifurcate();
+    if (miTexture != NULL) {
+	delete miTexture;
+	miTexture = NULL;
+    }
+    if (miPicNode != NULL) {
+	PicNode *node = miPicNode->next;
+	while (node != NULL) {
+	    PicNode *next = node->next;
+	    delete node;
+	    node = next;
+	}
+	node = miPicNode->prev;
+	while (node != NULL) {
+	    PicNode *prev = node->prev;
+	    delete node;
+	    node = prev;
+	}
+	delete miPicNode;
+	miPicNode = NULL;
+    }
+}
+
+MiCasa::~MiCasa() {
+
+    ExitSinglePicView();
+
+    delete rootFolder;
+    delete vlc;
+
+    delete Folder16Tex;
+    delete Folder64Tex;
+    delete LoadingTex;
+
+}
+
+
+void MiCasa::MoonlightShadow(float x, float y, int w, int h) {
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->AddLine(ImVec2(x+w, y), ImVec2(x+w, y+h),  0xff666666, 1.0f);
     draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xff666666, 1.0f);
@@ -66,164 +154,177 @@ void DropShadow(float x, float y, int w, int h) {
     draw_list->AddLine(ImVec2(x, y+h), ImVec2(x+w+1, y+h),  0xffcccccc, 1.0f);
 }
 
-void FoldersOnTheLeft(Folder *folder) {
-    while (folder != NULL) {
-	if (folder->firstPic != NULL) {
-	    //
-	    //	FOLDER WITH PICTURES -- clickable
-	    //
-	    ImGui::Image((void*)(intptr_t)Folder16Tex, ImVec2(16,16));
-	    ImGui::SameLine();
-	    std::string s = folder->path->filename().string();
-	    const bool isSelected = folder == currentFolder;
-	    if (ImGui::Selectable(s.c_str(), isSelected)) {
-		if (currentPic != NULL) {
-		    delete currentPic;
-		    currentPic = NULL;
-		}
-		folderClicked = true;
-		currentFolder = folder;
-	    }
-	    //if (isSelected) ImGui::SetItemDefaultFocus();
-	} else {
-	    //
-	    //	FOLDER WITHOUT PICTURES -- non-clickable
-	    //
-	    std::string s = folder->path->filename().string();
-	    ImGui::TextUnformatted(s.c_str());
-	    ImGui::SameLine();
-	    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-	    ImVec2 p = ImGui::GetCursorScreenPos();
-	    draw_list->AddLine(ImVec2(p.x, p.y+8), ImVec2(p.x + ImGui::GetColumnWidth(), p.y+8),  ImGui::GetColorU32(ImGuiCol_Border));
-	    ImGui::SameLine();
-	    ImGui::TextUnformatted("");
+void MiCasa::FoldersOnTheLeft(Folder *folder) {
+    if (!folder->pictures.empty()) {
+	//
+	//	FOLDER WITH PICTURES -- clickable
+	//
+	ImGui::Image((void*)(intptr_t)Folder16Tex->texture, ImVec2(Folder16Tex->width, Folder16Tex->height));
+	ImGui::SameLine();
+	std::string s = folder->path->filename().string();
+	const bool isSelected = (folder == miFolder);
+	if (ImGui::Selectable(s.c_str(), isSelected)) {
+	    folderClicked = true;
+	    miFolder = folder;
 	}
-	FoldersOnTheLeft(folder->firstBorn);
-	folder = folder->next;
+	//if (isSelected) ImGui::SetItemDefaultFocus();
+    } else {
+	//
+	//	FOLDER WITHOUT PICTURES -- non-clickable
+	//
+	std::string s = folder->path->filename().string();
+	ImGui::TextUnformatted(s.c_str());
+	ImGui::SameLine();
+	ImDrawList *draw_list = ImGui::GetWindowDrawList();
+	ImVec2 p = ImGui::GetCursorScreenPos();
+	draw_list->AddLine(ImVec2(p.x, p.y+8), ImVec2(p.x + ImGui::GetColumnWidth(), p.y+8),  ImGui::GetColorU32(ImGuiCol_Border));
+	ImGui::SameLine();
+	ImGui::TextUnformatted("");
+    }
+    for (Folder *child : folder->children) {
+	FoldersOnTheLeft(child);
     }
 }
 
-void PhotoStreamOnTheRight(Folder *folder, int limit_w, int limit_h) {
-    //int limit_w = (int) ImGui::GetWindowContentRegionMax().x/6;
-    //int limit_h = limit_w*3/4;
-    while (folder != NULL) {
-	// Instead of drawing items and then asking ImGui::IsItemVisible(),
-	// use a miscellaneous combination of:
-	// GetCursorPosY()			current position in scrolling area
-	// GetScrollY()			visible window start
-	// GetWindowSize().y?	visible window height
-	// SetCursorPos(ImVec2) -- to skip over lines without drawing anything
-	if (ImGui::GetCursorPosY()+32 >= ImGui::GetScrollY()-100
+void MiCasa::Photo(Folder *folder, Pic *pic) {
+    float cw = ImGui::GetColumnWidth();
+    ImVec2 cp = ImGui::GetCursorScreenPos();
+    if (folderClicked == false && cp.y < ImGui::GetScrollY()+(ImGui::GetWindowSize().y/2)) {
+	miFolder = folder;
+    }
+
+    int pw, ph;
+    Texture *texture = pic->texture;
+    if (texture == NULL) {
+	if (pic->isVideo == false) {
+	    load_it = pic;
+	}
+	texture = LoadingTex;
+	texture->Fit(&pw, &ph, limit_w, limit_h);
+    } else {
+	if (texture->Fit(&pw, &ph, limit_w, limit_h) == false) {
+	    if (pic->isVideo == false) {
+		load_it = pic;
+	    }
+	}
+    }
+
+    int x = cp.x + (cw - pw) / 2;
+    int y = cp.y + (cw - ph) / 2;
+    ImGui::SetCursorScreenPos(ImVec2(x, y));
+    ImGui::ImageButton((void*)(intptr_t)texture->texture, ImVec2(pw, ph),
+	ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0,
+	ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    if (ImGui::IsItemClicked()) {
+	//miPic = pic;
+	PicNode *prevNode = NULL;
+	for (Pic *fldpic : folder->pictures) {
+	    PicNode *newNode = new PicNode(fldpic);
+	    newNode->prev = prevNode;
+	    if (prevNode != NULL) {
+		prevNode->next = newNode;
+	    }
+	    if (pic == fldpic) {
+		miPicNode = newNode;
+	    }
+	    prevNode = newNode;
+	}
+    }
+    MoonlightShadow(x, y, pw, ph);
+    ImGui::NextColumn();
+}
+
+void MiCasa::PhotoStreamOnTheRight(Folder *folder) {
+    // Instead of drawing items and then asking ImGui::IsItemVisible(),
+    // use a miscellaneous combination of:
+    // GetCursorPosY()			current position in scrolling area
+    // GetScrollY()			visible window start
+    // GetWindowSize().y?	visible window height    // SetCursorPos(ImVec2) -- to skip over lines without drawing anything
+    if (ImGui::GetCursorPosY()+32 >= ImGui::GetScrollY()-100
+	&& ImGui::GetCursorPosY() <= ImGui::GetScrollY()+ImGui::GetWindowSize().y+100) {
+
+	ImGui::Columns(1);
+	ImGui::Image((void *)(intptr_t)Folder64Tex->texture, ImVec2(Folder64Tex->width, Folder64Tex->height));
+	ImGui::SameLine();
+	std::string s = folder->path->string();
+	ImGui::TextUnformatted(s.c_str());
+
+	//if (folder->loaded == false) {
+	//folder->load(limit_w, limit_h, LoadingTex, limit_w, limit_h);
+	//}
+	ImGui::NextColumn();
+
+    } else {
+	ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), ImGui::GetCursorPosY()+32));
+    }
+    if (folderClicked == true && miFolder == folder) {
+	//ImGui::SetItemDefaultFocus();
+	//ImGui::SetScrollHereY();
+	ImGui::SetScrollFromPosY(ImGui::GetCursorPosY()-ImGui::GetScrollY(), 0.5f);
+    }
+
+    bool haveColumnsBeenSet = false;
+    std::forward_list<Pic*>::iterator pic_it = folder->pictures.begin();
+    while (pic_it != folder->pictures.end()) {
+	if (ImGui::GetCursorPosY()+limit_h >= ImGui::GetScrollY()-100
 	    && ImGui::GetCursorPosY() <= ImGui::GetScrollY()+ImGui::GetWindowSize().y+100) {
 
-	    ImGui::Columns(1);
-	    ImGui::Image((void *)(intptr_t)Folder64Tex, ImVec2(64,64));
-	    ImGui::SameLine();
-	    std::string s = folder->path->string();
-	    ImGui::TextUnformatted(s.c_str());
-
-	    //if (folder->loaded == false) {
-		//folder->load(limit_w, limit_h, LoadingTex, limit_w, limit_h);
-	    //}
-	    ImGui::NextColumn();
+	    if (haveColumnsBeenSet == false) {
+		ImGui::Columns(5, NULL, false);
+		haveColumnsBeenSet = true;
+	    }
+	    for (int i=0; i<5 && pic_it != folder->pictures.end(); i++, pic_it++) {
+		Photo(folder, *pic_it);
+	    }
 
 	} else {
-	    ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), ImGui::GetCursorPosY()+32));
-	}
-	if (folderClicked == true && currentFolder == folder) {
-	    //ImGui::SetItemDefaultFocus();
-	    //ImGui::SetScrollHereY();
-	    ImGui::SetScrollFromPosY(ImGui::GetCursorPosY()-ImGui::GetScrollY(), 0.5f);
-	}
-
-	bool haveColumnsBeenSet = false;
-	Pic *pic = folder->firstPic;
-	while (pic != NULL) {
-	    if (ImGui::GetCursorPosY()+limit_h >= ImGui::GetScrollY()-100
-		&& ImGui::GetCursorPosY() <= ImGui::GetScrollY()+ImGui::GetWindowSize().y+100) {
-
-		if (haveColumnsBeenSet == false) {
-		    ImGui::Columns(5, NULL, false);
-		    haveColumnsBeenSet = true;
+	    if (ImGui::GetCursorPosY()+limit_h < ImGui::GetScrollY()-20000
+		|| ImGui::GetCursorPosY() > ImGui::GetScrollY()+ImGui::GetWindowSize().y+20000) {
+		for (int i=0; i<5 && pic_it != folder->pictures.end(); i++, pic_it++) {
+		    (*pic_it)->unload();
 		}
-
-		float cw = ImGui::GetColumnWidth();
-		for (int i=0; ((i<5) && (pic != NULL)); i++) {
-		    if (pic->loaded == false) {
-			loadAPic = pic;
+	    } else if (ImGui::GetCursorPosY()+limit_h > ImGui::GetScrollY()-10000
+		&& ImGui::GetCursorPosY() < ImGui::GetScrollY()+ImGui::GetWindowSize().y+10000) {
+		for (int i=0; i<5 && pic_it != folder->pictures.end(); i++, pic_it++) {
+		    Pic *pic = *pic_it;
+		    if (load_it == NULL && pic->isVideo == false && pic->texture == NULL) {
+			load_it = pic;
 		    }
-		    ImVec2 cp = ImGui::GetCursorScreenPos();
-		    if (folderClicked == false && cp.y < ImGui::GetScrollY()+(ImGui::GetWindowSize().y/2)) {
-			currentFolder = folder;
-		    }
-
-		    int pw, ph;
-		    Fit2U(&pw, &ph, pic->width, pic->height, limit_w, limit_h, true);
-
-		    int x = cp.x + (cw - pw) / 2;
-		    int y = cp.y + (cw - ph) / 2;
-		    ImGui::SetCursorScreenPos(ImVec2(x, y));
-		    ImGui::ImageButton((void*)(intptr_t)pic->texture, ImVec2(pw,ph),
-			ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0,
-			ImVec4(0.80f, 0.80f, 0.83f, 1.00f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-		    if (ImGui::IsItemClicked()) {
-			if (currentPic != NULL) {
-			    delete currentPic;
-			}
-			currentPic = new Pic(pic);
-		    }
-		    DropShadow(x, y, pw, ph);
-		    ImGui::NextColumn();
-		    pic = pic->next;
 		}
-
 	    } else {
-		if (ImGui::GetCursorPosY()+limit_h < ImGui::GetScrollY()-20000
-		    || ImGui::GetCursorPosY() > ImGui::GetScrollY()+ImGui::GetWindowSize().y+20000) {
-		    for (int i=0; ((i<5) && (pic != NULL)); i++) {
-			if (pic->loaded == true) {
-			    pic->unload();
-			}
-			pic = pic->next;
-		    }
-		} else if (ImGui::GetCursorPosY()+limit_h > ImGui::GetScrollY()-10000
-		    && ImGui::GetCursorPosY() < ImGui::GetScrollY()+ImGui::GetWindowSize().y+10000) {
-		    for (int i=0; i<5 && (pic != NULL); i++) {
-			if (loadAPic == NULL && pic->loaded == false) {
-			    loadAPic = pic;
-			}
-			pic = pic->next;
-		    }
-		} else {
-		    for (int i=0; i<5 && (pic != NULL); i++) {
-			pic = pic->next;
-		    }
+		for (int i=0; i<5 && pic_it != folder->pictures.end(); i++, pic_it++) {
 		}
-		ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), ImGui::GetCursorPosY()+limit_h));
 	    }
+	    ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), ImGui::GetCursorPosY()+limit_h));
 	}
-	PhotoStreamOnTheRight(folder->firstBorn, limit_w, limit_h);
-	folder = folder->next;
+    }
+    for (Folder *child : folder->children) {
+	PhotoStreamOnTheRight(child);
     }
 }
 
-float zoom_value;
-float zoomoffset_x;
-float zoomoffset_y;
-
-void SingleChosenPic() {
+void MiCasa::SingleChosenPic() {
     ImGui::BeginChild("ScrollRegion3", ImVec2(0, 0), false);
 
     int pw, ph;
     float dw = ImGui::GetWindowContentRegionMax().x-4; //* 96 / 100;
     float dh = ImGui::GetWindowContentRegionMax().y-4; //* 96 / 100;
 
-    if (currentPic->isVideo == true) {
-	vlc->integrate(currentPic);
+    if (miPicNode->pic->isVideo == true) {
+	vlc->integrate(miTexture);
     }
-    float z = 64 / zoom_value;
 
-    Fit2U(&pw, &ph, currentPic->width, currentPic->height, (int) dw*z, (int) dh*z, true);
+    Texture *texture = miTexture;
+    if (texture == NULL && miPicNode->pic->isVideo == false) {
+	texture = miPicNode->pic->texture;
+    }
+    if (texture == NULL) {
+	texture = LoadingTex;
+    }
+
+    float z = 64 / zoom_value;
+    texture->Fit(&pw, &ph, (int) dw*z, (int) dh*z);
+
     ImVec2 cp = ImGui::GetCursorScreenPos();
     float mid_x = cp.x + (dw / 2);	// middle point of the "picture area"
     float mid_y = cp.y + (dh / 2);
@@ -265,8 +366,8 @@ void SingleChosenPic() {
     float y = mid_y - (ph / 2) + zoomoffset_y;
 
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddImage((void*)(intptr_t)currentPic->texture, ImVec2(x, y), ImVec2(x+pw,y+ph), ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0xffffffff);
-    DropShadow(x, y, pw, ph);
+    draw_list->AddImage((void*)(intptr_t)texture->texture, ImVec2(x, y), ImVec2(x+pw,y+ph), ImVec2(0.0f,0.0f), ImVec2(1.0f,1.0f), 0xffffffff);
+    MoonlightShadow(x, y, pw, ph);
 
     //
     // OVERLAY
@@ -274,13 +375,110 @@ void SingleChosenPic() {
     ImGui::SetCursorPos(cp);
 
     ImGui::Button("Back to folder");
-    if (currentPic != NULL && ImGui::IsItemClicked()) {
-	vlc->bifurcate();
-	delete currentPic;
-	currentPic = NULL;
+    if (miPicNode != NULL && ImGui::IsItemClicked()) {
+	ExitSinglePicView();
     }
 
     ImGui::EndChild();
+}
+
+void MiCasa::RenderWindow() {
+    if (miPicNode != NULL) {
+	//
+	// WHEN A PICTURE HAS BEEN CHOSEN
+	//
+	SingleChosenPic();
+
+    } else {
+
+	ImGui::Columns(2, NULL);
+	if (frist) {
+	    ImGui::SetColumnWidth(0, ImGui::GetIO().DisplaySize.x / 5);
+	}
+	ImGui::BeginChild("ScrollRegion1", ImVec2(0, 0), false);
+	//
+	//	FOLDERS on the LEFT
+	//
+	ImGui::TextUnformatted("Folders");
+	FoldersOnTheLeft(rootFolder);
+	ImGui::EndChild();
+
+	load_it = NULL;
+
+	ImGui::NextColumn();
+	//
+	//	HUGE EVERGROWING PICTURE REGION
+	//
+	//ImGui::Text("Content");
+
+	ImGui::BeginChild("ScrollRegion2", ImVec2(0, 0), false);
+	//
+	// WHEN NO PICTURE HAS BEEN CHOSEN
+	// (=PHOTO STREAM)
+	//
+	limit_w = (int) ImGui::GetWindowContentRegionMax().x/6;
+	limit_h = limit_w*3/4;
+	PhotoStreamOnTheRight(rootFolder);
+	ImGui::EndChild();
+    }
+    folderClicked = false;
+    frist = false;
+}
+
+void MiCasa::KeyDown(int action) {
+    switch(action) {
+	case SDLK_q:
+	    done = true;
+	    break;
+	case SDLK_ESCAPE:
+	    if (miPicNode != NULL) {
+		ExitSinglePicView();
+	    }
+	    break;
+	case SDLK_LEFT:
+	    if (miPicNode != NULL && miPicNode->prev != NULL) {
+		vlc->bifurcate();
+		if (miTexture != NULL) {
+		    delete miTexture;
+		    miTexture = NULL;
+		}
+		miPicNode = miPicNode->prev;
+	    }
+	    break;
+	case SDLK_RIGHT:
+	    if (miPicNode != NULL && miPicNode->next != NULL) {
+		vlc->bifurcate();
+		if (miTexture != NULL) {
+		    delete miTexture;
+		    miTexture = NULL;
+		}
+		miPicNode = miPicNode->next;
+	    }
+	    break;
+            //case ' ':
+              //  printf("Pause toggle.\n");
+              //  pause = !pause;
+              //  break;
+        }
+}
+
+void MiCasa::LoadStuff() {
+    if (miPicNode != NULL && miTexture == NULL) {
+	zoom_value = 64.0f;
+	zoomoffset_x = 0.0f;
+	zoomoffset_y = 0.0f;
+	std::string s = miPicNode->pic->path->string();
+	if (miPicNode->pic->isVideo == true) {
+	    miTexture = vlc->integrationPreparation(s.c_str());
+	} else {
+	    miTexture = new Texture(s.c_str());
+	}
+    } else if (load_it != NULL) {
+	if (load_it->isVideo == false) {
+	    load_it->load(limit_w, limit_h);
+	    load_it = NULL;
+	}
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -320,23 +518,10 @@ int main(int argc, char *argv[]) {
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL2_Init();
 
-    LoadTextureFromMemory(folder16x16, sizeof(folder16x16), &Folder16Tex);
-    LoadTextureFromMemory(folder64x64, sizeof(folder64x64), &Folder64Tex);
-    LoadTextureFromMemory(loading, sizeof(loading), &LoadingTex);
+    MiCasa *m = new MiCasa(argc >= 1 ? argv[1] : NULL);
 
-    vlc = new VLCLibIntegration();
-
-    loadAPic = NULL;
-    currentPic = NULL;
-    currentFolder = NULL;
-    folderClicked = false;
-    bool frist = true;
-    bool done = false;
-
-    rootFolder = new Folder(argc < 2 ? fs::current_path() : fs::path(argv[1]), 128, 96, LoadingTex, 128, 96);
-    
     // Main loop
-    while (!done)
+    while (m->done == false)
     {
 	int action = 0;
         // Poll and handle events (inputs, window resize, etc.)
@@ -349,172 +534,77 @@ int main(int argc, char *argv[]) {
         {
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT) {
-                done = true;
+                m->done = true;
 	    } else if (event.type == SDL_KEYDOWN) {
 		action = event.key.keysym.sym;
 	    }
         }
-        switch(action) {
-            case SDLK_q:
-		done = true;
-		break;
-            case SDLK_ESCAPE:
-		if (currentPic != NULL) {
-		    vlc->bifurcate();
-		    delete currentPic;
-		    currentPic = NULL;
-		}
-                break;
-	    case SDLK_f:
-		if ((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0) {
-		    SDL_SetWindowFullscreen(window, 0);
-		} else {
-		    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-		}
-		break;
-	    case SDLK_LEFT:
-		if (currentPic != NULL && currentPic->prev != NULL) {
-		    vlc->bifurcate();
-		    Pic *pic = new Pic(currentPic->prev);
-		    delete currentPic;
-		    currentPic = pic;
-		}
-		break;
-	    case SDLK_RIGHT:
-		if (currentPic != NULL && currentPic->next != NULL) {
-		    vlc->bifurcate();
-		    Pic *pic = new Pic(currentPic->next);
-		    delete currentPic;
-		    currentPic = pic;
-		}
-		break;
-            //case ' ':
-              //  printf("Pause toggle.\n");
-              //  pause = !pause;
-              //  break;
-        }
-
-	{
-	    ImGui_ImplOpenGL2_NewFrame();
-	    ImGui_ImplSDL2_NewFrame(window);
-	    ImGui::NewFrame();
-
-	    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-	    ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-
-	    ImGui::Begin("MiCasa Main", NULL,
-		ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoFocusOnAppearing
-		|ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
-		|ImGuiWindowFlags_NoMove);
-
-	    /*if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) == 0) {
-
-		if (ImGui::BeginMenuBar()) {
-		    if (ImGui::BeginMenu("Menu")) {
-			//ShowExampleMenuFile();
-			ImGui::EndMenu();
-		    }
-		    if (ImGui::BeginMenu("Tools")) {
-			ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
-			ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
-			ImGui::MenuItem("About Dear ImGui", NULL, &show_app_about);
-			ImGui::EndMenu();
-		    }
-		    ImGui::EndMenuBar();
-		}
+	if (action == SDLK_f) {
+	    if ((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0) {
+		SDL_SetWindowFullscreen(window, 0);
 	    } else {
-	    }*/
+		SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	    }
+	}
 
-	    if (currentPic != NULL) {
-		//
-		// WHEN A PICTURE HAS BEEN CHOSEN
-		//
-		SingleChosenPic();
+	m->KeyDown(action);
 
+	if (ImGui::IsMouseDoubleClicked(0)) {
+	    if ((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0) {
+		SDL_SetWindowFullscreen(window, 0);
 	    } else {
+		SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	    }
+	}
 
-		ImGui::Columns(2, NULL);
-		if (frist) {
-		    ImGui::SetColumnWidth(0, io.DisplaySize.x / 5);
+
+	ImGui_ImplOpenGL2_NewFrame();
+	ImGui_ImplSDL2_NewFrame(window);
+	ImGui::NewFrame();
+
+	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+
+	ImGui::Begin("MiCasa Main", NULL,
+	    ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoFocusOnAppearing
+	    |ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
+	    |ImGuiWindowFlags_NoMove);
+
+	/*if (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP) == 0) {
+
+	    if (ImGui::BeginMenuBar()) {
+		if (ImGui::BeginMenu("Menu")) {
+		    //ShowExampleMenuFile();
+		    ImGui::EndMenu();
 		}
-		ImGui::BeginChild("ScrollRegion1", ImVec2(0, 0), false);
-		//
-		//	FOLDERS on the LEFT
-		//
-		ImGui::TextUnformatted("Folders");
-		FoldersOnTheLeft(rootFolder);
-		ImGui::EndChild();
-
-		loadAPic = NULL;
-
-		ImGui::NextColumn();
-		//
-		//	HUGE EVERGROWING PICTURE REGION
-		//
-		//ImGui::Text("Content");
-
-		ImGui::BeginChild("ScrollRegion2", ImVec2(0, 0), false);
-		//
-		// WHEN NO PICTURE HAS BEEN CHOSEN
-		// (=PHOTO STREAM)
-		//
-		int limit_w = (int) ImGui::GetWindowContentRegionMax().x/6;
-		int limit_h = limit_w*3/4;
-		PhotoStreamOnTheRight(rootFolder, limit_w, limit_h);
-		ImGui::EndChild();
-	    }
-	    ImGui::End();
-
-	    if (ImGui::IsMouseDoubleClicked(0)) {
-		if ((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0) {
-		    SDL_SetWindowFullscreen(window, 0);
-		} else {
-		    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+		if (ImGui::BeginMenu("Tools")) {
+		    ImGui::MenuItem("Metrics", NULL, &show_app_metrics);
+		    ImGui::MenuItem("Style Editor", NULL, &show_app_style_editor);
+		    ImGui::MenuItem("About Dear ImGui", NULL, &show_app_about);
+		    ImGui::EndMenu();
 		}
+		ImGui::EndMenuBar();
 	    }
+	} else {
+	}*/
 
-	    folderClicked = false;
+	m->RenderWindow();
 
-	    frist = false;
-            ImGui::Render();
-            glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+	ImGui::End();
 
-            //glClearColor(255, 255, 255, 255);
-            //glClear(GL_COLOR_BUFFER_BIT);
+	ImGui::Render();
+	glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
-            ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-            SDL_GL_SwapWindow(window);
+	//glClearColor(255, 255, 255, 255);
+	//glClear(GL_COLOR_BUFFER_BIT);
 
-	    if (currentPic != NULL && currentPic->loaded == false) {
-		zoom_value = 64.0f;
-		zoomoffset_x = 0.0f;
-		zoomoffset_y = 0.0f;
-		currentPic->load();
-	    } else if (loadAPic != NULL) {
-		loadAPic->load();
-		loadAPic = NULL;
-	    }
-        }
+	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+	SDL_GL_SwapWindow(window);
+
+	m->LoadStuff();
     }
-
-    if (currentPic != NULL) {
-	delete currentPic;
-	currentPic = NULL;
-    }
-
-    delete rootFolder;
-
-    delete vlc;
-
-    if (Folder16Tex != 0) {
-	glDeleteTextures(1, &Folder16Tex);
-    }
-    if (Folder64Tex != 0) {
-    	glDeleteTextures(1, &Folder64Tex);
-    }
-    if (LoadingTex != 0) {
-    	glDeleteTextures(1, &LoadingTex);
-    }
+    
+    delete m;
 
     // Cleanup
     ImGui_ImplOpenGL2_Shutdown();

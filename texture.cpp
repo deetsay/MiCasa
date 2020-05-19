@@ -1,37 +1,27 @@
+#include "texture.h"
+
 #include <stdio.h>
 #include <iostream>
-#include <SDL.h>
-#include <SDL_image.h>
-#include <SDL_opengl.h>
 
-bool Fit2U(int *resultWidth, int *resultHeight, int width, int height, int limit_w, int limit_h, bool stretch) {
-    if (width <= limit_w && height <= limit_h && stretch == false) {
-	*resultWidth = width;
-	*resultHeight = height;
-    }
-    if (limit_w < 0) {
-	limit_w = width;
-    }
-    if (limit_h < 0) {
-	limit_h = height;
-    }
-    float scale = (float)limit_w / width;
-    float scale_h = (float)limit_h / height;
+bool Texture::Fit(int *result_w, int *result_h, int limit_w, int limit_h) {
+
+    float scale = ((float) limit_w) / width;
+    float scale_h = ((float) limit_h) / height;
     if (scale_h < scale) {
 	scale = scale_h;
     }
-    if ((scale > 1.0f && stretch == false) || scale == 1.0f) {
-	*resultWidth = width;
-	*resultHeight = height;
-	return false;
-    } else {
-	*resultWidth = width * scale;
-	*resultHeight = height * scale;
+    if (limit_w==width || limit_h==height) {
+	*result_w = (int) width;
+	*result_h = (int) height;
 	return true;
+    } else {
+	*result_w = (int) (scale * width);
+	*result_h = (int) (scale * height);
+	return false;
     }
 }
 
-SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int limit_w, int limit_h) {
+SDL_Surface* Texture::Load_To_Size(const char *filename, int limit_w, int limit_h) {
     if (limit_w < 1 || limit_h < 1) {
 	return NULL;
     }
@@ -41,20 +31,28 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
 	std::cout << "Unable to load image '" << filename << "' ! SDL_image Error: " << IMG_GetError() << std::endl;
 	return NULL;
     }
-    //std::cout << " w " << surface->w << " h " << surface->h << " limit " << limit << std::endl;
     //std::cout << " format " << SDL_GetPixelFormatName(surface->format->format) << std::endl; 
 
-    Fit2U(width, height, surface->w, surface->h, limit_w, limit_h, true);
+    float scale = ((float) limit_w) / surface->w;
+    float scale_h = ((float) limit_h) / surface->h;
+    if (scale_h < scale) {
+	scale = scale_h;
+    }
+    int w = (int)(scale * surface->w);
+    int h = (int)(scale * surface->h);
+
+    width = (unsigned short) w;
+    height = (unsigned short) h;
 
     SDL_Rect targetDimensions;
     targetDimensions.x = 0;
     targetDimensions.y = 0;
-    targetDimensions.w = *width;
-    targetDimensions.h = *height;
+    targetDimensions.w = w;
+    targetDimensions.h = h;
 
     SDL_Surface *p32BPPSurface = SDL_CreateRGBSurfaceWithFormat(0,
-	*width,
-	*height,
+	w,
+	h,
 	32,
 	SDL_PIXELFORMAT_ABGR8888);
     if (p32BPPSurface == NULL) {
@@ -68,24 +66,12 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
     if (SDL_MUSTLOCK(p32BPPSurface)) {
 	SDL_LockSurface(p32BPPSurface);
     }
-    /*targetDimensions.x = 4; targetDimensions.y = 4;
-    SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 224, 224, 224, 255));
-    targetDimensions.x = 3; targetDimensions.y = 3;
-    SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 192, 192, 192, 255));
-    targetDimensions.x = 2; targetDimensions.y = 2;
-    SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 160, 160, 160, 255));
-    targetDimensions.x = 1; targetDimensions.y = 1;
-    SDL_FillRect(p32BPPSurface, &targetDimensions, SDL_MapRGBA(p32BPPSurface->format, 128, 128, 128, 255));
-    targetDimensions.x = 0; targetDimensions.y = 0;
-    */
 
     if (SDL_BlitScaled(surface, NULL, p32BPPSurface, &targetDimensions) < 0) {
 	std::cout << "Error! Did not blit surface: " << SDL_GetError() << std::endl;
     } else {
 	SDL_FreeSurface(surface);
 	surface = p32BPPSurface;
-	//*width = surface->w;
-	//*height = surface->h;
     }
     if (SDL_MUSTLOCK(p32BPPSurface)) {
 	SDL_UnlockSurface(p32BPPSurface);
@@ -93,24 +79,38 @@ SDL_Surface *Load_To_Size(const char *filename, int *width, int *height, int lim
     return surface;
 }
 
-void CreateNewTexture(GLuint *texture, int mode, int width, int height, void *pixels) {
-    glGenTextures(1, texture);
-    glBindTexture(GL_TEXTURE_2D, *texture);
+void Texture::InitFromPixels(void *pixels, int mode, int in_w, int in_h) {
+    width = (unsigned short) in_w;
+    height = (unsigned short) in_h;
+    if (in_w < 1 || in_h < 1) {
+	texture = 0;
+	return;
+    }
+
+    glGenTextures(1, &texture);
+    if (texture == 0) {
+	return;
+    }
+    glBindTexture(GL_TEXTURE_2D, texture);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, mode, width, height, 0, mode, GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, mode, in_w, in_h, 0, mode, GL_UNSIGNED_BYTE, pixels);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
-void UpdateTexture(GLuint *texture, int mode, int width, int height, void *pixels) {
-    glBindTexture(GL_TEXTURE_2D, *texture);
-    //glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    //glTexImage2D(GL_TEXTURE_2D, 0,  mode, width, height, 0, mode, GL_UNSIGNED_BYTE, pixels);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, mode, GL_UNSIGNED_BYTE, pixels);
+Texture::Texture(void *pixels, int mode, int in_w, int in_h) {
+    InitFromPixels(pixels, mode, in_w, in_h);
 }
 
-bool SurfaceToTexture(SDL_Surface *surface, GLuint *texture) {
+void Texture::Update(void *pixels, int mode) {
+    if (texture != 0) {
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (int) width, (int) height, mode, GL_UNSIGNED_BYTE, pixels);
+    }
+}
+
+void Texture::SurfaceToTexture(SDL_Surface *surface) {
     int mode = GL_RGB;
     switch (surface->format->format) {
 	case SDL_PIXELFORMAT_ABGR8888:
@@ -133,40 +133,51 @@ bool SurfaceToTexture(SDL_Surface *surface, GLuint *texture) {
 	default:
 	    //std::cout << "Error, image is not truecolor." << std::endl;
 	    SDL_FreeSurface(surface);
-	    return false;
+	    texture = 0;
+	    return;
     }
-    CreateNewTexture(texture, mode, surface->w, surface->h, surface->pixels);
+    InitFromPixels(surface->pixels, mode, surface->w, surface->h);
     SDL_FreeSurface(surface);
-    return true;
 }
 
-bool LoadTextureFromFile(const char *filename, GLuint *texture, int *width, int *height) {
+Texture::Texture(const char *filename) {
     SDL_Surface *surface = IMG_Load(filename);
     if (surface == NULL) {
 	std::cout << "Unable to load image '" << filename << "' ! SDL_image Error: " << IMG_GetError() << std::endl;
-	return false;
+	texture = 0;
+	return;
     }
-    return SurfaceToTexture(surface, texture);
+    SurfaceToTexture(surface);
 }
 
-bool LoadPreviewTextureFromFile(const char *filename, GLuint *texture, int *width, int *height, int limit_w, int limit_h) {
-    SDL_Surface *surface = Load_To_Size(filename, width, height, limit_w, limit_h);
+Texture::Texture(const char *filename, int limit_w, int limit_h) {
+    SDL_Surface *surface = Load_To_Size(filename, limit_w, limit_h);
     if (surface == NULL) {
 	std::cout << "Unable to load image '" << filename << "' ! SDL_image Error: " << IMG_GetError() << std::endl;
-	return false;
+	texture = 0;
+	return;
     }
-    return SurfaceToTexture(surface, texture);
+    SurfaceToTexture(surface);
 }
 
-void LoadTextureFromMemory(const void *data, int size, GLuint *texture) {
+Texture::Texture(const void *data, int size) {
+    width = 0;
+    height = 0;
     SDL_RWops *rw = SDL_RWFromConstMem(data, size);
     if (rw != NULL) {
 	SDL_Surface *surface = IMG_LoadPNG_RW(rw);
 	if (surface != NULL) {
-	    SurfaceToTexture(surface, texture);
+	    SurfaceToTexture(surface);
 	} else {
+	    texture = 0;
 	    std::cout << "Unable to load image! SDL_image Error: " << IMG_GetError() << std::endl;
 	}
 	SDL_RWclose(rw);
+    }
+}
+
+Texture::~Texture() {
+    if (texture != 0) {
+	glDeleteTextures(1, &texture);
     }
 }
