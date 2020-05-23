@@ -3,6 +3,7 @@
 #include <mutex>
 #include "vlc/vlc.h"
 #include "folder.h"
+#include "texture.h"
 
 class VLCLibIntegration {
 private:

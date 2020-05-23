@@ -1,45 +1,25 @@
 #include "pic.h"
+
 #include <regex>
 #include <iostream>
-#include <SDL_opengl.h>
 
 const std::regex vid_regex("^[^\\.].*\\.(mpg|mp4|avi|3gp)$", std::regex_constants::icase);
 
-Pic::Pic(fs::path path) {
-    this->path = new fs::path(path);
+Pic::Pic(fs::path path, int rotation) {
+    this->path = path;
+    this->flags = rotation&PIC_ROTATE;
 
-    texture = NULL;
-
+    std::string filename = path.filename();
     std::smatch vid_match;
-    std::string picname = path.filename().string();
-    isVideo = std::regex_match(picname, vid_match, vid_regex);
-}
-
-void Pic::unload() {
-    if (texture != NULL) {
-	delete texture;
-	texture = NULL;
+    if (std::regex_match(filename, vid_match, vid_regex)) {
+	this->flags |= PIC_VIDEO;
     }
 }
 
-void Pic::load(unsigned short limit_w, unsigned short limit_h) {
-    if (isVideo == false) {
-	unload();
-	std::string s = path->string();
-	texture = new Texture(s.c_str(), limit_w, limit_h);
-    }
+int Pic::get_rotation() {
+    return flags&PIC_ROTATE;
 }
 
-Pic::~Pic() {
-    delete path;
-
-    if (texture != NULL) {
-	delete texture;
-    }
-}
-
-PicNode::PicNode(Pic *pic) {
-    this->pic = pic;
-    next = NULL;
-    prev = NULL;
+bool Pic::is_video() {
+    return (flags&PIC_VIDEO)!=0;
 }

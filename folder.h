@@ -1,23 +1,15 @@
 #pragma once
 
 #include <filesystem>
-#include <forward_list>
-#include "texture.h"
-#include "pic.h"
 
 namespace fs = std::filesystem;
 
 class Folder {
 
 public:
-    fs::path *path;
+    fs::path path;
 
-    std::forward_list<Folder*> children;
+    int pic;
 
-    std::forward_list<Pic*> pictures;
-
-    Folder(fs::path path);
-    virtual ~Folder();
-
-    bool anyChildHasPictures();
+    Folder(fs::path path, int pic);
 };

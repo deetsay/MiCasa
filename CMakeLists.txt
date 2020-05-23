@@ -21,8 +21,8 @@ project(micasa VERSION 0.1)
 
 configure_file(micasa-config.h.in micasa-config.h)
 
-list(APPEND SOURCES main.cpp folder.cpp texture.cpp pic.cpp)
-list(APPEND SOURCES vlclib-integration.cpp)
+list(APPEND SOURCES main.cpp micasa.cpp folder.cpp texture.cpp pic.cpp)
+list(APPEND SOURCES vlclib-integration.cpp loader.cpp)
 
 ############################################################## Everything ImGui
 
@@ -70,6 +70,7 @@ endif()
 ################################################################## Build config
 
 add_executable(micasa ${SOURCES})
+list(APPEND LIBS pthread)
 target_link_libraries(micasa PUBLIC ${LIBS})
 target_include_directories(micasa PUBLIC ${PROJECT_BINARY_DIR} ${INCLUDES})
 

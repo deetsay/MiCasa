@@ -2,8 +2,6 @@
 
 #include <iostream>
 
-#include "texture.h"
-
 void *vlc_lock(void *opaq, void **pixels) {
     VLCLibIntegration *vlcinteg = (VLCLibIntegration *) opaq;
     vlcinteg->mutex.lock();
@@ -86,11 +84,13 @@ void VLCLibIntegration::integrate(Texture *texture) {
 }
 
 void VLCLibIntegration::bifurcate() {
+    mutex.lock();
     if (mp != NULL) {
 	libvlc_media_player_stop(mp);
 	libvlc_media_player_release(mp);
 	mp = NULL;
     }
+    mutex.unlock();
     //started = false;
     if (pixels != NULL) {
 	delete [] pixels;

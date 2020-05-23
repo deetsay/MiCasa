@@ -1,31 +1,27 @@
 #pragma once
 
+#include <string>
 #include <filesystem>
-#include "texture.h"
+
+#define PIC_ROTATE 3
+#define PIC_ROTATE_1 1
+#define PIC_ROTATE_2 2
+#define PIC_ROTATE_3 3
+#define PIC_VIDEO 1<<2
+#define PIC_HIDDEN 1<<3
 
 namespace fs = std::filesystem;
 
 class Pic {
+private:
+    int flags;
 
 public:
-    fs::path *path;
+    fs::path path;
 
-    bool isVideo;
+    Pic(fs::path path, int flags);
 
-    Texture *texture;
+    int get_rotation();
 
-    Pic(fs::path path);
-    virtual ~Pic();
-
-    void load(unsigned short limit_w, unsigned short limit_h);
-    void unload();
-};
-
-class PicNode {
-public:
-    Pic *pic;
-    PicNode *next;
-    PicNode *prev;
-
-    PicNode(Pic *pic);
+    bool is_video();
 };
