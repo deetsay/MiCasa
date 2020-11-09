@@ -26,12 +26,13 @@ list(APPEND SOURCES vlclib-integration.cpp)
 
 ############################################################## Everything ImGui
 
-set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/imgui)
+set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/thirdparty/imgui)
 list(APPEND INCLUDES ${IMGUI_DIR})
+list(APPEND INCLUDES ${IMGUI_DIR}/backends)
 list(APPEND SOURCES ${IMGUI_DIR}/imgui.cpp)
 list(APPEND SOURCES ${IMGUI_DIR}/imgui_draw.cpp)
-list(APPEND SOURCES ${IMGUI_DIR}/imgui_impl_opengl2.cpp)
-list(APPEND SOURCES ${IMGUI_DIR}/imgui_impl_sdl.cpp)
+list(APPEND SOURCES ${IMGUI_DIR}/backends/imgui_impl_opengl2.cpp)
+list(APPEND SOURCES ${IMGUI_DIR}/backends/imgui_impl_sdl.cpp)
 list(APPEND SOURCES ${IMGUI_DIR}/imgui_widgets.cpp)
 
 ############################################################### Everything SDL2
